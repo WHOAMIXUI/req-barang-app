@@ -7,7 +7,7 @@
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Inter Font -->
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght=300;400;500;600;700;800&display=swap" rel="stylesheet">
     <!-- Lucide Icons -->
     <script src="https://unpkg.com/lucide@latest"></script>
     <!-- Chart.js -->
@@ -38,6 +38,23 @@
     </style>
 </head>
 <body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col overflow-x-hidden">
+
+    <!-- CLOUD LOADING SCREEN OVERLAY -->
+    <div id="cloud-loader" class="hidden fixed inset-0 z-[100] bg-slate-950/80 backdrop-blur-md flex flex-col items-center justify-center text-white">
+        <div class="p-6 bg-slate-900 rounded-3xl border border-slate-800 flex flex-col items-center max-w-sm text-center shadow-2xl space-y-4">
+            <div class="relative w-16 h-16">
+                <div class="absolute inset-0 rounded-full border-4 border-indigo-500/20"></div>
+                <div class="absolute inset-0 rounded-full border-4 border-indigo-500 border-t-transparent animate-spin"></div>
+                <div class="absolute inset-0 flex items-center justify-center text-indigo-400">
+                    <i data-lucide="cloud-lightning" class="w-6 h-6 animate-pulse"></i>
+                </div>
+            </div>
+            <div>
+                <h3 class="font-bold text-lg" id="loader-title">Sinkronisasi Cloud</h3>
+                <p class="text-xs text-slate-400 mt-1" id="loader-desc">Menghubungkan ke database Google Sheets Anda...</p>
+            </div>
+        </div>
+    </div>
 
     <!-- APP CONTAINER -->
     <div id="app" class="flex-grow flex flex-col">
@@ -169,9 +186,13 @@
                         <h2 class="font-bold text-slate-800 text-lg md:text-xl" id="header-page-title">Ringkasan Dashboard</h2>
                     </div>
 
-                    <!-- Connection Quick Status Badge -->
-                    <div class="flex items-center gap-3">
-                        <span id="quick-status-badge" class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-amber-50 text-amber-700 border border-amber-100">
+                    <!-- Connection & Sync Controls Header -->
+                    <div class="flex items-center gap-2.5">
+                        <button onclick="pullCloudData(true)" id="btn-manual-sync" class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-all" title="Sinkronkan data dari Cloud Google Sheets">
+                            <i data-lucide="refresh-cw" class="w-3.5 h-3.5" id="sync-icon"></i>
+                            <span>Sync Data</span>
+                        </button>
+                        <span id="quick-status-badge" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium bg-amber-50 text-amber-700 border border-amber-100">
                             <span class="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
                             Mode Lokal
                         </span>
@@ -282,24 +303,12 @@
                                     <!-- Cabang Filter -->
                                     <select id="filter-branch" 
                                         class="px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                                        <option value="ALL">Semua Cabang</option>
-                                        <option value="Cabang Jakarta">Cabang Jakarta</option>
-                                        <option value="Cabang Bandung">Cabang Bandung</option>
-                                        <option value="Cabang Surabaya">Cabang Surabaya</option>
-                                        <option value="Cabang Medan">Cabang Medan</option>
-                                        <option value="Cabang Makassar">Cabang Makassar</option>
-                                        <option value="Cabang Semarang">Cabang Semarang</option>
-                                        <option value="Cabang Yogyakarta">Cabang Yogyakarta</option>
+                                        <!-- Dynamic options -->
                                     </select>
                                     <!-- Category Filter -->
                                     <select id="filter-category" 
                                         class="px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                                        <option value="ALL">Semua Kategori</option>
-                                        <option value="IT Equipment">IT Equipment</option>
-                                        <option value="Office Supplies">Office Supplies</option>
-                                        <option value="Furniture">Furniture</option>
-                                        <option value="Software">Software</option>
-                                        <option value="Others">Kategori Lainnya</option>
+                                        <!-- Dynamic options -->
                                     </select>
                                     <!-- Status Filter -->
                                     <select id="filter-status" 
@@ -352,7 +361,7 @@
                             <!-- Table Footer / Stats -->
                             <div class="p-4 bg-slate-50 border-t border-slate-200 flex items-center justify-between text-xs text-slate-500">
                                 <div>Menampilkan <span id="table-shown-count" class="font-semibold text-slate-700">0</span> dari <span id="table-total-count" class="font-semibold text-slate-700">0</span> pengajuan</div>
-                                <div class="font-medium">Sesuai format data <span class="font-bold underline text-indigo-600">E-Request_Items_FINAL.xlsx</span></div>
+                                <div class="font-medium">Format Data Cloud Terintegrasi <span class="font-bold underline text-indigo-600">Google Sheets Database</span></div>
                             </div>
                         </div>
                     </div>
@@ -367,7 +376,7 @@
                                 </div>
                                 <div class="space-y-1">
                                     <h3 class="font-bold text-slate-900 text-sm">Penyimpanan Realtime Google Spreadsheet</h3>
-                                    <p class="text-xs text-slate-500">Secara default, data Anda disimpan secara lokal pada browser. Hubungkan ke **Google Spreadsheet** agar setiap kali diinput, data di spreadsheet Anda juga otomatis berubah secara live.</p>
+                                    <p class="text-xs text-slate-500">Hubungkan aplikasi web Anda ke **Google Spreadsheet** menggunakan Apps Script Web App URL yang baru. Data pengajuan, cabang, dan kategori akan otomatis tersinkronisasi lintas perangkat secara real-time.</p>
                                 </div>
                             </div>
 
@@ -430,7 +439,7 @@
                             <div class="flex flex-wrap gap-3 pt-2">
                                 <button id="btn-show-sync-guide" class="flex items-center gap-2 px-4 py-2.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-semibold rounded-xl border border-emerald-200 transition-all">
                                     <i data-lucide="table-properties" class="w-4 h-4"></i>
-                                    Petunjuk Setup Spreadsheet
+                                    Petunjuk Setup Spreadsheet (Read & Write)
                                 </button>
                                 <button id="btn-show-github-guide" class="flex items-center gap-2 px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-xl border border-slate-300 transition-all">
                                     <i data-lucide="github" class="w-4 h-4"></i>
@@ -444,7 +453,7 @@
 
                 <!-- FOOTER -->
                 <footer class="bg-white border-t border-slate-200 py-4 text-center text-xs text-slate-400">
-                    &copy; 2026 E-Request Items System. Menyesuaikan data file <span class="font-mono text-slate-500">E-Request_Items_FINAL.xlsx</span>.
+                    &copy; 2026 E-Request Items System. Menyesuaikan format data <span class="font-mono text-slate-500">E-Request_Items_FINAL.xlsx</span>.
                 </footer>
             </div>
         </div>
@@ -485,14 +494,7 @@
                                 <label class="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wider">Cabang Kantor</label>
                                 <select id="form-branch" required
                                     class="w-full px-3 py-2 text-sm border border-slate-200 bg-slate-50 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all">
-                                    <option value="" disabled selected>Pilih Cabang</option>
-                                    <option value="Cabang Jakarta">Cabang Jakarta</option>
-                                    <option value="Cabang Bandung">Cabang Bandung</option>
-                                    <option value="Cabang Surabaya">Cabang Surabaya</option>
-                                    <option value="Cabang Medan">Cabang Medan</option>
-                                    <option value="Cabang Makassar">Cabang Makassar</option>
-                                    <option value="Cabang Semarang">Cabang Semarang</option>
-                                    <option value="Cabang Yogyakarta">Cabang Yogyakarta</option>
+                                    <!-- Dynamic Options -->
                                 </select>
                             </div>
                         </div>
@@ -508,12 +510,7 @@
                                 <label class="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wider">Kategori Barang</label>
                                 <select id="form-category" required
                                     class="w-full px-3 py-2 text-sm border border-slate-200 bg-slate-50 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all">
-                                    <option value="" disabled selected>Pilih Kategori</option>
-                                    <option value="IT Equipment">IT Equipment</option>
-                                    <option value="Office Supplies">Office Supplies</option>
-                                    <option value="Furniture">Furniture</option>
-                                    <option value="Software">Software</option>
-                                    <option value="Others">Kategori Lainnya</option>
+                                    <!-- Dynamic Options -->
                                 </select>
                             </div>
                             <div>
@@ -655,8 +652,8 @@
                             <i data-lucide="table-properties" class="w-5 h-5"></i>
                         </div>
                         <div>
-                            <h3 class="font-bold text-slate-900">Integrasi Realtime Google Spreadsheet</h3>
-                            <p class="text-xs text-slate-400 mt-0.5">Sinkronkan data secara realtime dari aplikasi ke file spreadsheet Anda</p>
+                            <h3 class="font-bold text-slate-900">Integrasi Realtime Google Spreadsheet (Read & Write)</h3>
+                            <p class="text-xs text-slate-400 mt-0.5">Sinkronkan data secara realtime dari aplikasi ke file spreadsheet Anda secara dua arah</p>
                         </div>
                     </div>
                     <button class="modal-close p-1.5 hover:bg-slate-100 text-slate-400 hover:text-slate-600 rounded-lg transition-all">
@@ -673,68 +670,147 @@
                         <div class="flex gap-3">
                             <div class="flex-shrink-0 w-6 h-6 bg-slate-100 text-slate-700 rounded-full flex items-center justify-center text-xs font-bold mt-0.5">1</div>
                             <div>
-                                <p class="font-semibold text-slate-800">Buat Spreadsheet Baru & Sesuaikan Header</p>
-                                <p class="text-xs text-slate-500 mt-1">Buat file Google Spreadsheet baru, dan tambahkan nama kolom berikut di baris pertama:</p>
-                                <div class="mt-2 flex flex-wrap gap-1">
-                                    <span class="bg-slate-100 px-2 py-0.5 rounded text-xs text-slate-600 border border-slate-200 font-mono">ID Pengajuan</span>
-                                    <span class="bg-slate-100 px-2 py-0.5 rounded text-xs text-slate-600 border border-slate-200 font-mono">Nama Pemohon</span>
-                                    <span class="bg-slate-100 px-2 py-0.5 rounded text-xs text-slate-600 border border-slate-200 font-mono">Cabang</span>
-                                    <span class="bg-slate-100 px-2 py-0.5 rounded text-xs text-slate-600 border border-slate-200 font-mono">Nama Barang</span>
-                                    <span class="bg-slate-100 px-2 py-0.5 rounded text-xs text-slate-600 border border-slate-200 font-mono">Kategori</span>
-                                    <span class="bg-slate-100 px-2 py-0.5 rounded text-xs text-slate-600 border border-slate-200 font-mono">Jumlah</span>
-                                    <span class="bg-slate-100 px-2 py-0.5 rounded text-xs text-slate-600 border border-slate-200 font-mono">Estimasi Harga</span>
-                                    <span class="bg-slate-100 px-2 py-0.5 rounded text-xs text-slate-600 border border-slate-200 font-mono">Urgensi</span>
-                                    <span class="bg-slate-100 px-2 py-0.5 rounded text-xs text-slate-600 border border-slate-200 font-mono">Status</span>
-                                    <span class="bg-slate-100 px-2 py-0.5 rounded text-xs text-slate-600 border border-slate-200 font-mono">Tanggal</span>
-                                </div>
+                                <p class="font-semibold text-slate-800">Buat Spreadsheet Baru & Apps Script</p>
+                                <p class="text-xs text-slate-500 mt-1">Buat file Google Spreadsheet baru, klik menu **Extensions (Ekstensi)** -> **Apps Script**.</p>
                             </div>
                         </div>
 
                         <div class="flex gap-3">
                             <div class="flex-shrink-0 w-6 h-6 bg-slate-100 text-slate-700 rounded-full flex items-center justify-center text-xs font-bold mt-0.5">2</div>
-                            <div>
-                                <p class="font-semibold text-slate-800">Buka Script Editor</p>
-                                <p class="text-xs text-slate-500 mt-1">Pada Google Spreadsheet Anda, klik menu **Extensions (Ekstensi)** -> **Apps Script**.</p>
-                            </div>
-                        </div>
-
-                        <div class="flex gap-3">
-                            <div class="flex-shrink-0 w-6 h-6 bg-slate-100 text-slate-700 rounded-full flex items-center justify-center text-xs font-bold mt-0.5">3</div>
                             <div class="flex-grow">
-                                <p class="font-semibold text-slate-800">Salin & Tempel Kode Ini</p>
-                                <p class="text-xs text-slate-500 mt-1">Hapus semua kode bawaan di Apps Script, lalu tempel kode berikut:</p>
+                                <p class="font-semibold text-slate-800">Salin & Tempel Kode Apps Script Lintas Perangkat (Read & Write)</p>
+                                <p class="text-xs text-slate-500 mt-1">Hapus semua kode bawaan di Apps Script, lalu tempel kode berikut. Kode ini otomatis membuat lembar kerja `Requests`, `Branches`, dan `Categories` jika belum ada:</p>
                                 
                                 <div class="relative mt-2">
-                                    <textarea readonly id="apps-script-code" rows="7" 
+                                    <textarea readonly id="apps-script-code" rows="10" 
                                         class="w-full p-3 bg-slate-900 text-emerald-400 font-mono text-xs rounded-xl focus:outline-none border border-slate-800 resize-none">
+function doGet(e) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  
+  function getOrCreateSheet(name, headers) {
+    var sheet = ss.getSheetByName(name);
+    if (!sheet) {
+      sheet = ss.insertSheet(name);
+      sheet.appendRow(headers);
+    }
+    return sheet;
+  }
+  
+  var requestSheet = getOrCreateSheet("Requests", ["ID", "Nama Pemohon", "Cabang", "Nama Barang", "Kategori", "Jumlah", "Estimasi Harga", "Urgensi", "Status", "Tanggal", "Gambar"]);
+  var branchSheet = getOrCreateSheet("Branches", ["Nama Cabang"]);
+  var categorySheet = getOrCreateSheet("Categories", ["Nama Kategori"]);
+  
+  var reqData = requestSheet.getDataRange().getValues();
+  var requests = [];
+  for (var i = 1; i < reqData.length; i++) {
+    if (reqData[i][0]) {
+      requests.push({
+        id: reqData[i][0].toString(),
+        requester: reqData[i][1],
+        branch: reqData[i][2],
+        itemName: reqData[i][3],
+        category: reqData[i][4],
+        quantity: Number(reqData[i][5]),
+        price: Number(reqData[i][6]),
+        urgency: reqData[i][7],
+        status: reqData[i][8],
+        date: reqData[i][9] ? new Date(reqData[i][9]).toISOString().split('T')[0] : "",
+        image: reqData[i][10] || ""
+      });
+    }
+  }
+  
+  var brData = branchSheet.getDataRange().getValues();
+  var branches = [];
+  for (var i = 1; i < brData.length; i++) {
+    if (brData[i][0]) branches.push(brData[i][0]);
+  }
+  
+  var catData = categorySheet.getDataRange().getValues();
+  var categories = [];
+  for (var i = 1; i < catData.length; i++) {
+    if (catData[i][0]) categories.push(catData[i][0]);
+  }
+  
+  var result = {
+    requests: requests,
+    branches: branches.length > 0 ? branches : null,
+    categories: categories.length > 0 ? categories : null
+  };
+  
+  return ContentService.createTextOutput(JSON.stringify(result))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
 function doPost(e) {
   try {
-    var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
     var data = JSON.parse(e.postData.contents);
+    var action = data.action;
     
-    // Pastikan susunan kolom sesuai dengan Cabang
-    sheet.appendRow([
-      data.id,
-      data.requester,
-      data.branch,
-      data.itemName,
-      data.category,
-      data.quantity,
-      data.price,
-      data.urgency,
-      data.status,
-      data.date
-    ]);
+    if (action === "saveRequest") {
+      var sheet = ss.getSheetByName("Requests");
+      var rows = sheet.getDataRange().getValues();
+      var foundIndex = -1;
+      for (var i = 1; i < rows.length; i++) {
+        if (rows[i][0].toString() === data.payload.id.toString()) {
+          foundIndex = i + 1;
+          break;
+        }
+      }
+      
+      var rowData = [
+        data.payload.id,
+        data.payload.requester,
+        data.payload.branch,
+        data.payload.itemName,
+        data.payload.category,
+        data.payload.quantity,
+        data.payload.price,
+        data.payload.urgency,
+        data.payload.status,
+        data.payload.date,
+        data.payload.image || ""
+      ];
+      
+      if (foundIndex !== -1) {
+        sheet.getRange(foundIndex, 1, 1, rowData.length).setValues([rowData]);
+      } else {
+        sheet.appendRow(rowData);
+      }
+    } 
+    else if (action === "deleteRequest") {
+      var sheet = ss.getSheetByName("Requests");
+      var rows = sheet.getDataRange().getValues();
+      for (var i = 1; i < rows.length; i++) {
+        if (rows[i][0].toString() === data.id.toString()) {
+          sheet.deleteRow(i + 1);
+          break;
+        }
+      }
+    }
+    else if (action === "syncBranches") {
+      var sheet = ss.getSheetByName("Branches");
+      sheet.clear();
+      sheet.appendRow(["Nama Cabang"]);
+      data.branches.forEach(function(b) {
+        sheet.appendRow([b]);
+      });
+    }
+    else if (action === "syncCategories") {
+      var sheet = ss.getSheetByName("Categories");
+      sheet.clear();
+      sheet.appendRow(["Nama Kategori"]);
+      data.categories.forEach(function(c) {
+        sheet.appendRow([c]);
+      });
+    }
     
-    return ContentService.createTextOutput(JSON.stringify({
-      "result": "success", 
-      "message": "Data berhasil disinkronkan ke Google Sheet!"
-    })).setMimeType(ContentService.MimeType.JSON);
-  } catch(error) {
-    return ContentService.createTextOutput(JSON.stringify({
-      "result": "error", 
-      "message": error.toString()
-    })).setMimeType(ContentService.MimeType.JSON);
+    return ContentService.createTextOutput(JSON.stringify({ result: "success" }))
+      .setMimeType(ContentService.MimeType.JSON);
+  } catch(err) {
+    return ContentService.createTextOutput(JSON.stringify({ result: "error", message: err.toString() }))
+      .setMimeType(ContentService.MimeType.JSON);
   }
 }</textarea>
                                     <button id="btn-copy-script" class="absolute top-2 right-2 px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded text-xs font-medium transition-all flex items-center gap-1">
@@ -745,25 +821,17 @@ function doPost(e) {
                         </div>
 
                         <div class="flex gap-3">
-                            <div class="flex-shrink-0 w-6 h-6 bg-slate-100 text-slate-700 rounded-full flex items-center justify-center text-xs font-bold mt-0.5">4</div>
+                            <div class="flex-shrink-0 w-6 h-6 bg-slate-100 text-slate-700 rounded-full flex items-center justify-center text-xs font-bold mt-0.5">3</div>
                             <div>
                                 <p class="font-semibold text-slate-800">Deploy sebagai Aplikasi Web (PENTING!)</p>
                                 <p class="text-xs text-slate-500 mt-1">
                                     1. Klik tombol **Deploy (Terapkan)** di kanan atas -> **New Deployment (Penerapan Baru)**.<br>
                                     2. Pilih jenis konfigurasi sebagai **Web App (Aplikasi Web)**.<br>
                                     3. Ubah kolom *"Execute as"* menjadi **Me (Email Anda)**.<br>
-                                    4. <span class="font-bold text-rose-600">PENTING:</span> Ubah kolom *"Who has access"* menjadi **Anyone (Siapa saja)**. Jika ini salah, data tidak akan bisa masuk.<br>
+                                    4. <span class="font-bold text-rose-600">PENTING:</span> Ubah kolom *"Who has access"* menjadi **Anyone (Siapa saja)**.<br>
                                     5. Klik **Deploy**, klik **Authorize Access**, dan setujui izin akses akun Google Anda.<br>
-                                    6. Salin **Web App URL** yang dihasilkan (pastikan link berakhiran <code class="font-mono bg-slate-100 text-slate-700 px-1">/exec</code>, bukan <code class="font-mono bg-slate-100 text-slate-700 px-1">/edit</code>).
+                                    6. Salin **Web App URL** yang dihasilkan dan sambungkan di tab Pengaturan.
                                 </p>
-                            </div>
-                        </div>
-
-                        <div class="flex gap-3">
-                            <div class="flex-shrink-0 w-6 h-6 bg-emerald-100 text-emerald-700 rounded-full flex items-center justify-center text-xs font-bold mt-0.5">5</div>
-                            <div>
-                                <p class="font-semibold text-emerald-800">Sambungkan URL di Menu Pengaturan</p>
-                                <p class="text-xs text-slate-500 mt-1">Kembali ke tab **Pengaturan & Sync** di aplikasi ini, masukkan URL yang telah disalin, lalu klik Simpan. Aplikasi Anda sekarang terintegrasi secara live ke Google Sheets!</p>
                             </div>
                         </div>
                     </div>
@@ -805,7 +873,7 @@ function doPost(e) {
                             <div class="flex-shrink-0 w-6 h-6 bg-slate-100 text-slate-700 rounded-full flex items-center justify-center text-xs font-bold mt-0.5">1</div>
                             <div>
                                 <p class="font-semibold text-slate-800">Buat Repository Baru di GitHub</p>
-                                <p class="text-xs text-slate-500 mt-1">Masuk ke akun GitHub Anda, klik **New Repository**. Beri nama bebas (misal: <code class="font-mono bg-slate-100 px-1 rounded">e-request-items</code>) dan pastikan visibilitasnya diatur ke **Public**.</p>
+                                <p class="text-xs text-slate-500 mt-1">Masuk ke akun GitHub Anda, klik **New Repository**. Beri nama bebas (misal: `e-request-items`) dan pastikan visibilitasnya diatur ke **Public**.</p>
                             </div>
                         </div>
 
@@ -813,7 +881,7 @@ function doPost(e) {
                             <div class="flex-shrink-0 w-6 h-6 bg-slate-100 text-slate-700 rounded-full flex items-center justify-center text-xs font-bold mt-0.5">2</div>
                             <div>
                                 <p class="font-semibold text-slate-800">Upload File index.html</p>
-                                <p class="text-xs text-slate-500 mt-1">Klik **Uploading an existing file** pada repository baru Anda, lalu unggah file <code class="font-mono bg-slate-100 px-1 rounded">index.html</code> ini ke sana. Klik **Commit changes**.</p>
+                                <p class="text-xs text-slate-500 mt-1">Klik **Uploading an existing file** pada repository baru Anda, lalu unggah file `index.html` ini ke sana. Klik **Commit changes**.</p>
                             </div>
                         </div>
 
@@ -867,7 +935,7 @@ function doPost(e) {
 
     <!-- ================= SCRIPT LOGIC AND CORE ENGINE ================= -->
     <script>
-        // DATA AWAL SESUAI FORMAT "E-Request_Items_FINAL.xlsx" DENGAN CABANG
+        // DATA AWAL SEBAGAI CADANGAN JIKA BELUM TERHUBUNG GOOGLE SHEETS
         const INITIAL_EXCEL_DATA = [
             { id: "REQ-001", requester: "Ahmad Subarjo", branch: "Cabang Jakarta", itemName: "Monitor LG UltraFine 24 inch", category: "IT Equipment", quantity: 3, price: 3450000, urgency: "High", status: "Approved", date: "2026-07-01", image: "" },
             { id: "REQ-002", requester: "Siti Rahmawati", branch: "Cabang Bandung", itemName: "Kursi Ergonomis Office Plus", category: "Furniture", quantity: 5, price: 1850000, urgency: "Medium", status: "Pending", date: "2026-07-03", image: "" },
@@ -899,38 +967,21 @@ function doPost(e) {
 
         // Initialize App
         window.addEventListener("DOMContentLoaded", () => {
-            // Load saved requests or use default Excel mockup
-            const savedRequests = localStorage.getItem("erequest_data");
-            if (savedRequests) {
-                state.requests = JSON.parse(savedRequests);
-            } else {
-                state.requests = [...INITIAL_EXCEL_DATA];
-                saveToLocalStorage();
-            }
-
-            // Load saved branches or use default
+            // Load branches & categories defaults
             const savedBranches = localStorage.getItem("erequest_branches");
-            if (savedBranches) {
-                state.branches = JSON.parse(savedBranches);
-            } else {
-                state.branches = ["Cabang Jakarta", "Cabang Bandung", "Cabang Surabaya", "Cabang Medan", "Cabang Makassar", "Cabang Semarang", "Cabang Yogyakarta"];
-                localStorage.setItem("erequest_branches", JSON.stringify(state.branches));
-            }
-
-            // Load saved categories or use default
+            state.branches = savedBranches ? JSON.parse(savedBranches) : ["Cabang Jakarta", "Cabang Bandung", "Cabang Surabaya", "Cabang Medan", "Cabang Makassar", "Cabang Semarang", "Cabang Yogyakarta"];
+            
             const savedCategories = localStorage.getItem("erequest_categories");
-            if (savedCategories) {
-                state.categories = JSON.parse(savedCategories);
-            } else {
-                state.categories = ["IT Equipment", "Office Supplies", "Furniture", "Software", "Others"];
-                localStorage.setItem("erequest_categories", JSON.stringify(state.categories));
-            }
+            state.categories = savedCategories ? JSON.parse(savedCategories) : ["IT Equipment", "Office Supplies", "Furniture", "Software", "Others"];
 
-            // Populate all dynamic options
+            // Load requests defaults
+            const savedRequests = localStorage.getItem("erequest_data");
+            state.requests = savedRequests ? JSON.parse(savedRequests) : [...INITIAL_EXCEL_DATA];
+
+            // Setup UI views
             populateDropdowns();
             renderBranchAndCategoryManagers();
 
-            // Sync Web App URL input
             if (state.sheetsUrl) {
                 const urlInput = document.getElementById("spreadsheet-url-input");
                 if (urlInput) urlInput.value = state.sheetsUrl;
@@ -940,24 +991,109 @@ function doPost(e) {
                 updateConnectionBadge(false);
             }
 
-            // Initialize Icons
+            // Setup event listeners & icons
+            initEventListeners();
             lucide.createIcons();
 
-            // Setup event listeners
-            initEventListeners();
-            
-            // Check session
+            // Auto-fetch data from cloud on startup if sheets URL exists
+            if (state.sheetsUrl) {
+                pullCloudData(false);
+            }
+
+            // Check login session
             if (sessionStorage.getItem("erequest_session") === "active") {
                 loginSuccess();
             }
         });
 
-        // Save DB Locally
+        // Save Local Fallback
         function saveToLocalStorage() {
             localStorage.setItem("erequest_data", JSON.stringify(state.requests));
+            localStorage.setItem("erequest_branches", JSON.stringify(state.branches));
+            localStorage.setItem("erequest_categories", JSON.stringify(state.categories));
         }
 
-        // Helper URL validation format
+        // ================= INTEGRASI CLOUD (READ & WRITE) =================
+
+        // Tarik data secara real-time dari Google Sheets (GET)
+        async function pullCloudData(showToast = true) {
+            if (!state.sheetsUrl) {
+                if (showToast) showNotification("Mode Lokal", "Sambungkan URL Google Spreadsheet terlebih dahulu di tab Pengaturan.", "error");
+                return;
+            }
+
+            const loader = document.getElementById("cloud-loader");
+            const syncIcon = document.getElementById("sync-icon");
+            
+            loader.classList.remove("hidden");
+            if (syncIcon) syncIcon.classList.add("animate-spin");
+
+            try {
+                // Fetch data dari Google Apps Script Web App
+                const response = await fetch(state.sheetsUrl);
+                if (!response.ok) throw new Error("Gagal mengambil data dari Google Sheets");
+                
+                const cloudData = await response.json();
+                
+                // Perbarui state lokal dengan data dari Cloud Google Sheets
+                if (cloudData.requests) {
+                    state.requests = cloudData.requests;
+                }
+                if (cloudData.branches) {
+                    state.branches = cloudData.branches;
+                }
+                if (cloudData.categories) {
+                    state.categories = cloudData.categories;
+                }
+
+                // Simpan cadangan ke localStorage
+                saveToLocalStorage();
+
+                // Segarkan UI dropdown dan tabel
+                populateDropdowns();
+                renderBranchAndCategoryManagers();
+                renderDashboard();
+
+                if (showToast) {
+                    showNotification("Data Sinkron!", "Seluruh data terbaru berhasil ditarik dari Cloud Google Sheets.", "success");
+                }
+            } catch (error) {
+                console.error("Cloud Sync Error:", error);
+                if (showToast) {
+                    showNotification("Sinkronisasi Gagal", "Gagal memuat data dari Cloud. Sistem beralih menggunakan memori lokal.", "error");
+                }
+            } finally {
+                loader.classList.add("hidden");
+                if (syncIcon) syncIcon.classList.remove("animate-spin");
+            }
+        }
+
+        // Kirim update ke Google Sheets (POST)
+        async function pushCloudAction(actionType, payload) {
+            if (!state.sheetsUrl) return;
+
+            try {
+                const bodyData = {
+                    action: actionType,
+                    ...payload
+                };
+
+                await fetch(state.sheetsUrl, {
+                    method: "POST",
+                    mode: "no-cors", // Menghindari masalah CORS di beberapa browser
+                    headers: {
+                        "Content-Type": "text/plain;charset=utf-8"
+                    },
+                    body: JSON.stringify(bodyData)
+                });
+            } catch (error) {
+                console.error("Cloud Write Error:", error);
+                showNotification("Gagal Sinkronisasi", "Gagal mengirim data ke Google Sheets, data tetap disimpan lokal.", "error");
+            }
+        }
+
+        // ================= FORM AND INTERACTIVE LOGICS =================
+
         function validateUrlFormat(url) {
             const warningBox = document.getElementById("url-validation-warning");
             if (!url) {
@@ -973,19 +1109,17 @@ function doPost(e) {
             }
         }
 
-        // Sync connection badge status UI
         function updateConnectionBadge(isConnected) {
             const badge = document.getElementById("quick-status-badge");
             if (isConnected) {
-                badge.className = "inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-100";
-                badge.innerHTML = `<span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span> Terkoneksi (Sheets)`;
+                badge.className = "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-100";
+                badge.innerHTML = `<span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span> Mode Cloud`;
             } else {
-                badge.className = "inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-amber-50 text-amber-700 border border-amber-100";
-                badge.innerHTML = `<span class="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span> Mode Lokal`;
+                badge.className = "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium bg-amber-50 text-amber-700 border border-amber-100";
+                badge.innerHTML = `<span class="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse"></span> Mode Lokal`;
             }
         }
 
-        // Trigger Toast notifications to UI
         function showNotification(title, text, type = "success") {
             const toast = document.getElementById("toast");
             const toastText = document.getElementById("toast-text");
@@ -1022,7 +1156,6 @@ function doPost(e) {
             }, 4000);
         }
 
-        // Format IDR Rupiah Currency Helper
         function formatRupiah(value) {
             return new Intl.NumberFormat('id-ID', {
                 style: 'currency',
@@ -1031,7 +1164,6 @@ function doPost(e) {
             }).format(value);
         }
 
-        // ================= COMPRESS IMAGE UTILITY =================
         function compressImageFile(file, callback) {
             const reader = new FileReader();
             reader.onload = function (event) {
@@ -1039,8 +1171,6 @@ function doPost(e) {
                 img.onload = function () {
                     const canvas = document.createElement("canvas");
                     const ctx = canvas.getContext("2d");
-                    
-                    // Batasi resolusi maksimal 400px (Sangat cukup untuk preview & hemat memori)
                     const MAX_WIDTH = 400;
                     const MAX_HEIGHT = 400;
                     let width = img.width;
@@ -1061,8 +1191,6 @@ function doPost(e) {
                     canvas.width = width;
                     canvas.height = height;
                     ctx.drawImage(img, 0, 0, width, height);
-                    
-                    // Kompresi ke format JPEG dengan kualitas 70%
                     const compressedBase64 = canvas.toDataURL("image/jpeg", 0.7);
                     callback(compressedBase64);
                 };
@@ -1071,7 +1199,8 @@ function doPost(e) {
             reader.readAsDataURL(file);
         }
 
-        // ================= DYNAMIC LIST MANAGERS =================
+        // ================= LIST AND DROPDOWN RENDERS =================
+
         function populateDropdowns() {
             // 1. Populate Branch Filter
             const filterBranch = document.getElementById("filter-branch");
@@ -1113,7 +1242,6 @@ function doPost(e) {
             const categoryList = document.getElementById("manager-category-list");
             if (!branchList || !categoryList) return;
 
-            // Render Branch list tags
             branchList.innerHTML = "";
             state.branches.forEach(b => {
                 const div = document.createElement("div");
@@ -1127,7 +1255,6 @@ function doPost(e) {
                 branchList.appendChild(div);
             });
 
-            // Render Category list tags
             categoryList.innerHTML = "";
             state.categories.forEach(c => {
                 const div = document.createElement("div");
@@ -1144,7 +1271,7 @@ function doPost(e) {
             lucide.createIcons();
         }
 
-        function addBranchOption() {
+        async function addBranchOption() {
             const input = document.getElementById("new-branch-input");
             const val = input.value.trim();
             if (!val) return;
@@ -1153,28 +1280,37 @@ function doPost(e) {
                 return;
             }
             state.branches.push(val);
-            localStorage.setItem("erequest_branches", JSON.stringify(state.branches));
+            saveToLocalStorage();
             input.value = "";
             populateDropdowns();
             renderBranchAndCategoryManagers();
+
+            // Cloud Sync
+            if (state.sheetsUrl) {
+                await pushCloudAction("syncBranches", { branches: state.branches });
+            }
             showNotification("Cabang Ditambahkan", `Cabang "${val}" berhasil ditambahkan ke daftar.`, "success");
         }
 
-        function deleteBranchOption(branchName) {
-            // Validation check: Jangan hapus jika ada data pengajuan yang aktif menggunakannya
+        async function deleteBranchOption(branchName) {
             const inUse = state.requests.some(r => r.branch === branchName);
             if (inUse) {
                 showNotification("Tidak Dapat Dihapus", `Cabang "${branchName}" sedang digunakan oleh data pengajuan yang ada.`, "error");
                 return;
             }
             state.branches = state.branches.filter(b => b !== branchName);
-            localStorage.setItem("erequest_branches", JSON.stringify(state.branches));
+            saveToLocalStorage();
             populateDropdowns();
             renderBranchAndCategoryManagers();
+
+            // Cloud Sync
+            if (state.sheetsUrl) {
+                await pushCloudAction("syncBranches", { branches: state.branches });
+            }
             showNotification("Cabang Dihapus", `Cabang "${branchName}" berhasil dihapus dari daftar.`, "info");
         }
 
-        function addCategoryOption() {
+        async function addCategoryOption() {
             const input = document.getElementById("new-category-input");
             const val = input.value.trim();
             if (!val) return;
@@ -1183,56 +1319,59 @@ function doPost(e) {
                 return;
             }
             state.categories.push(val);
-            localStorage.setItem("erequest_categories", JSON.stringify(state.categories));
+            saveToLocalStorage();
             input.value = "";
             populateDropdowns();
             renderBranchAndCategoryManagers();
+
+            // Cloud Sync
+            if (state.sheetsUrl) {
+                await pushCloudAction("syncCategories", { categories: state.categories });
+            }
             showNotification("Kategori Ditambahkan", `Kategori "${val}" berhasil ditambahkan ke daftar.`, "success");
         }
 
-        function deleteCategoryOption(categoryName) {
-            // Validation check: Jangan hapus jika ada data pengajuan yang aktif menggunakannya
+        async function deleteCategoryOption(categoryName) {
             const inUse = state.requests.some(r => r.category === categoryName);
             if (inUse) {
                 showNotification("Tidak Dapat Dihapus", `Kategori "${categoryName}" sedang digunakan oleh data pengajuan yang ada.`, "error");
                 return;
             }
             state.categories = state.categories.filter(c => c !== categoryName);
-            localStorage.setItem("erequest_categories", JSON.stringify(state.categories));
+            saveToLocalStorage();
             populateDropdowns();
             renderBranchAndCategoryManagers();
+
+            // Cloud Sync
+            if (state.sheetsUrl) {
+                await pushCloudAction("syncCategories", { categories: state.categories });
+            }
             showNotification("Kategori Dihapus", `Kategori "${categoryName}" berhasil dihapus dari daftar.`, "info");
         }
 
-        // Expose functions globally for dynamic onclick handlers
         window.addBranchOption = addBranchOption;
         window.deleteBranchOption = deleteBranchOption;
         window.addCategoryOption = addCategoryOption;
         window.deleteCategoryOption = deleteCategoryOption;
 
         // ================= NAVIGATION TAB CONTROLLERS =================
+
         function switchTab(tabId) {
-            // Hide all tabs
             const tabs = document.querySelectorAll(".tab-content");
             tabs.forEach(tab => tab.classList.add("hidden"));
 
-            // Show selected tab
             document.getElementById(tabId).classList.remove("hidden");
-
-            // Update state & Active styling sidebar menu
             state.activeTab = tabId;
             
-            // Remove active classes
             document.getElementById("nav-dashboard-tab").classList.remove("sidebar-active");
             document.getElementById("nav-requests-tab").classList.remove("sidebar-active");
             document.getElementById("nav-settings-tab").classList.remove("sidebar-active");
 
-            // Define Header Title dynamically
             let headerTitle = "Ringkasan Dashboard";
             if (tabId === "dashboard-tab") {
                 document.getElementById("nav-dashboard-tab").classList.add("sidebar-active");
                 headerTitle = "Ringkasan Dashboard";
-                renderCharts(); // Re-render charts
+                renderCharts();
             } else if (tabId === "requests-tab") {
                 document.getElementById("nav-requests-tab").classList.add("sidebar-active");
                 headerTitle = "Daftar Pengajuan Barang";
@@ -1245,8 +1384,8 @@ function doPost(e) {
         }
 
         // ================= INITIALIZE ACTION EVENTS =================
+
         function initEventListeners() {
-            // Mobile Sidebar Toggler
             const sidebar = document.querySelector("aside");
             document.getElementById("sidebar-open-mobile").addEventListener("click", () => {
                 sidebar.classList.remove("-translate-x-full");
@@ -1258,7 +1397,7 @@ function doPost(e) {
                 sidebar.classList.remove("fixed", "inset-y-0", "left-0", "z-50", "translate-x-0");
             });
 
-            // Login submit form listener
+            // Login Submit
             document.getElementById("login-form").addEventListener("submit", (e) => {
                 e.preventDefault();
                 const user = document.getElementById("username").value.trim();
@@ -1273,7 +1412,6 @@ function doPost(e) {
                 }
             });
 
-            // Toggle Password Eye visibility
             document.getElementById("toggle-password").addEventListener("click", () => {
                 const passInput = document.getElementById("password");
                 const passIcon = document.getElementById("password-icon");
@@ -1303,12 +1441,9 @@ function doPost(e) {
 
                         compressImageFile(file, (base64) => {
                             state.currentFormImageBase64 = base64;
-                            
-                            // Tampilkan Pratinjau
                             document.getElementById("form-image-preview").src = base64;
                             document.getElementById("form-image-preview-container").classList.remove("hidden");
                             
-                            // Kembalikan label
                             labelText.textContent = "Ganti Foto...";
                             iconEl.setAttribute("data-lucide", "image");
                             iconEl.classList.remove("animate-spin");
@@ -1318,7 +1453,6 @@ function doPost(e) {
                 });
             }
 
-            // Hapus gambar terpilih di form
             document.getElementById("btn-remove-image").addEventListener("click", () => {
                 state.currentFormImageBase64 = "";
                 document.getElementById("form-image-file").value = "";
@@ -1330,7 +1464,6 @@ function doPost(e) {
                 lucide.createIcons();
             });
 
-            // Lightbox Modal dismiss handlers
             const closeLightbox = () => {
                 document.getElementById("lightbox-modal").classList.add("hidden");
                 document.getElementById("lightbox-img").src = "";
@@ -1338,8 +1471,8 @@ function doPost(e) {
             document.getElementById("btn-close-lightbox").addEventListener("click", closeLightbox);
             document.getElementById("btn-close-lightbox-ok").addEventListener("click", closeLightbox);
 
-            // Save Web App URL
-            document.getElementById("btn-save-sheets-url").addEventListener("click", () => {
+            // Simpan Web App URL
+            document.getElementById("btn-save-sheets-url").addEventListener("click", async () => {
                 const urlInput = document.getElementById("spreadsheet-url-input").value.trim();
                 state.sheetsUrl = urlInput;
                 localStorage.setItem("erequest_sheets_url", urlInput);
@@ -1350,6 +1483,7 @@ function doPost(e) {
                     if (isValid) {
                         updateConnectionBadge(true);
                         showNotification("Koneksi Ditambahkan!", "Integrasi realtime Google Spreadsheet aktif.", "success");
+                        await pullCloudData(true);
                     } else {
                         updateConnectionBadge(false);
                         showNotification("Peringatan Link!", "Tampaknya format URL yang Anda masukkan salah.", "error");
@@ -1360,7 +1494,6 @@ function doPost(e) {
                 }
             });
 
-            // Log Out action button
             document.getElementById("btn-logout").addEventListener("click", () => {
                 sessionStorage.removeItem("erequest_session");
                 state.isLoggedIn = false;
@@ -1369,7 +1502,7 @@ function doPost(e) {
                 showNotification("Berhasil Logout", "Sesi login Anda telah diakhiri.", "info");
             });
 
-            // Search Filter controls
+            // Filter Handlers
             document.getElementById("table-search").addEventListener("input", (e) => {
                 state.searchQuery = e.target.value.toLowerCase();
                 renderTable();
@@ -1390,19 +1523,16 @@ function doPost(e) {
                 renderTable();
             });
 
-            // Add Request button handler
             document.getElementById("btn-add-request").addEventListener("click", () => {
                 openRequestModal();
             });
 
-            // Modal guides open trigger listeners
             const showSyncModals = () => document.getElementById("sync-modal").classList.remove("hidden");
             const showGithubModals = () => document.getElementById("github-modal").classList.remove("hidden");
 
             document.getElementById("btn-show-sync-guide").addEventListener("click", showSyncModals);
             document.getElementById("btn-show-github-guide").addEventListener("click", showGithubModals);
 
-            // Modal dismiss/closes callback
             const modalCloses = document.querySelectorAll(".modal-close");
             modalCloses.forEach(btn => {
                 btn.addEventListener("click", () => {
@@ -1412,7 +1542,6 @@ function doPost(e) {
                 });
             });
 
-            // Custom modal delete controls callbacks
             document.getElementById("btn-cancel-delete").addEventListener("click", () => {
                 document.getElementById("delete-confirm-modal").classList.add("hidden");
                 state.pendingDeleteId = null;
@@ -1424,7 +1553,6 @@ function doPost(e) {
                 }
             });
 
-            // Copy script button callback
             document.getElementById("btn-copy-script").addEventListener("click", () => {
                 const copyText = document.getElementById("apps-script-code");
                 copyText.select();
@@ -1433,21 +1561,20 @@ function doPost(e) {
                 showNotification("Salin Kode!", "Apps Script berhasil dicopy ke clipboard.", "success");
             });
 
-            // Request submit handler
             document.getElementById("request-form").addEventListener("submit", (e) => {
                 e.preventDefault();
                 submitRequestForm();
             });
         }
 
-        // ================= CORE MODULES ENGINE AND HANDLERS =================
+        // ================= DASHBOARD AND CHART BUILDERS =================
+
         function loginSuccess() {
             sessionStorage.setItem("erequest_session", "active");
             state.isLoggedIn = true;
             document.getElementById("login-section").classList.add("hidden");
             document.getElementById("main-panel").classList.remove("hidden");
             
-            // Clear passwords security
             document.getElementById("username").value = "";
             document.getElementById("password").value = "";
 
@@ -1473,18 +1600,16 @@ function doPost(e) {
             renderCharts();
         }
 
-        // ================= CHART RENDERING MECHANISM (Chart.js) =================
         function renderCharts() {
             if (state.activeTab !== "dashboard-tab") return;
 
-            // Destroy previous charts to avoid canvas overlaps
             if (state.charts.urgency) state.charts.urgency.destroy();
             if (state.charts.branch) state.charts.branch.destroy();
             if (state.charts.category) state.charts.category.destroy();
 
             const data = state.requests;
 
-            // 1. URGENCY DATA BREAKDOWN
+            // 1. URGENCY
             const highCount = data.filter(r => r.urgency === "High").length;
             const mediumCount = data.filter(r => r.urgency === "Medium").length;
             const lowCount = data.filter(r => r.urgency === "Low").length;
@@ -1510,18 +1635,14 @@ function doPost(e) {
                 }
             });
 
-            // 2. BRANCH DATA BREAKDOWN
-            const branches = [
-                "Cabang Jakarta", "Cabang Bandung", "Cabang Surabaya", 
-                "Cabang Medan", "Cabang Makassar", "Cabang Semarang", "Cabang Yogyakarta"
-            ];
-            const branchCounts = branches.map(br => data.filter(r => r.branch === br).length);
+            // 2. BRANCH
+            const branchCounts = state.branches.map(br => data.filter(r => r.branch === br).length);
 
             const ctxBranch = document.getElementById("branchChart").getContext("2d");
             state.charts.branch = new Chart(ctxBranch, {
                 type: 'bar',
                 data: {
-                    labels: branches.map(b => b.replace("Cabang ", "")),
+                    labels: state.branches.map(b => b.replace("Cabang ", "")),
                     datasets: [{
                         label: 'Jumlah Pengajuan',
                         data: branchCounts,
@@ -1541,21 +1662,18 @@ function doPost(e) {
                 }
             });
 
-            // 3. CATEGORY DATA BREAKDOWN
-            const categories = ["IT Equipment", "Office Supplies", "Furniture", "Software", "Others"];
-            const catCounts = categories.map(cat => data.filter(r => r.category === cat).length);
+            // 3. CATEGORY
+            const catCounts = state.categories.map(cat => data.filter(r => r.category === cat).length);
 
             const ctxCategory = document.getElementById("categoryChart").getContext("2d");
             state.charts.category = new Chart(ctxCategory, {
                 type: 'bar',
                 data: {
-                    labels: categories,
+                    labels: state.categories,
                     datasets: [{
                         label: 'Alokasi Pengajuan',
                         data: catCounts,
-                        backgroundColor: [
-                            '#818cf8', '#34d399', '#fca5a5', '#60a5fa', '#94a3b8'
-                        ],
+                        backgroundColor: ['#818cf8', '#34d399', '#fca5a5', '#60a5fa', '#94a3b8', '#a78bfa', '#ec4899', '#f43f5e'],
                         borderRadius: 6,
                         maxBarThickness: 35
                     }]
@@ -1573,6 +1691,7 @@ function doPost(e) {
         }
 
         // ================= TABLE RENDER ENGINE =================
+
         function renderTable() {
             const tableBody = document.getElementById("request-table-body");
             const emptyState = document.getElementById("table-empty-state");
@@ -1594,7 +1713,6 @@ function doPost(e) {
                 return matchesSearch && matchesBranch && matchesCategory && matchesStatus;
             });
 
-            // Sort by ID latest
             filtered.sort((a, b) => b.id.localeCompare(a.id));
 
             if (filtered.length === 0) {
@@ -1606,7 +1724,6 @@ function doPost(e) {
                     const tr = document.createElement("tr");
                     tr.className = "hover:bg-slate-50 transition-all duration-150 border-b border-slate-100";
 
-                    // Badges indicators
                     let urgencyBadge = "";
                     if (item.urgency === "High") {
                         urgencyBadge = `<span class="inline-flex px-2.5 py-1 text-[10px] font-bold bg-rose-50 text-rose-700 rounded-md border border-rose-100">HIGH</span>`;
@@ -1625,7 +1742,6 @@ function doPost(e) {
                         statusBadge = `<span class="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold bg-amber-50 text-amber-700 rounded-full border border-amber-100"><i data-lucide="alert-circle" class="w-3.5 h-3.5"></i> Menunggu</span>`;
                     }
 
-                    // Bukti Foto / Image status thumbnail
                     let imageContent = "-";
                     if (item.image) {
                         imageContent = `
@@ -1684,7 +1800,6 @@ function doPost(e) {
             lucide.createIcons();
         }
 
-        // ================= VIEW IMAGE DETAIL IN LIGHTBOX =================
         function viewImageDetail(id) {
             const item = state.requests.find(r => r.id === id);
             if (item && item.image) {
@@ -1694,15 +1809,14 @@ function doPost(e) {
             }
         }
 
-        // Expose viewImageDetail globally
         window.viewImageDetail = viewImageDetail;
 
-        // ================= MODAL FORM CONTROL UTILS =================
+        // ================= MODAL AND SUBMIT ACTIONS =================
+
         function openRequestModal(existingItem = null) {
             const form = document.getElementById("request-form");
             form.reset();
 
-            // Reset image states
             state.currentFormImageBase64 = "";
             document.getElementById("form-image-file").value = "";
             document.getElementById("form-image-preview").src = "";
@@ -1722,7 +1836,6 @@ function doPost(e) {
                 document.getElementById("form-quantity").value = existingItem.quantity;
                 document.getElementById("form-price").value = existingItem.price;
                 
-                // Set images preview if exists
                 if (existingItem.image) {
                     state.currentFormImageBase64 = existingItem.image;
                     document.getElementById("form-image-preview").src = existingItem.image;
@@ -1747,7 +1860,6 @@ function doPost(e) {
             document.getElementById("request-modal").classList.remove("hidden");
         }
 
-        // ================= SUBMIT FORM CONTROLLER (LOCALSTORAGE & GOOGLE SHEETS) =================
         async function submitRequestForm() {
             const editId = document.getElementById("edit-request-id").value;
             
@@ -1758,7 +1870,7 @@ function doPost(e) {
             const urgency = document.getElementById("form-urgency").value;
             const quantity = parseInt(document.getElementById("form-quantity").value);
             const price = parseFloat(document.getElementById("form-price").value);
-            const image = state.currentFormImageBase64 || ""; // Base64 string image
+            const image = state.currentFormImageBase64 || "";
             
             let status = "Pending";
             if (editId) {
@@ -1769,26 +1881,26 @@ function doPost(e) {
             }
 
             const today = new Date().toISOString().split('T')[0];
+            let targetRequest = null;
 
             if (editId) {
-                // EDIT PROCESS
                 const index = state.requests.findIndex(r => r.id === editId);
                 if (index !== -1) {
                     state.requests[index] = {
                         ...state.requests[index],
                         requester, branch, itemName, category, urgency, quantity, price, image, status
                     };
+                    targetRequest = state.requests[index];
                     saveToLocalStorage();
-                    showNotification("Berhasil Diupdate", `Pengajuan ${editId} berhasil diperbarui.`, "success");
+                    showNotification("Berhasil Diupdate", `Pengajuan ${editId} berhasil diperbarui secara lokal.`, "success");
                 }
             } else {
-                // ADD PROCESS
                 const nextIdNum = state.requests.length > 0 
                     ? Math.max(...state.requests.map(r => parseInt(r.id.split('-')[1]))) + 1 
                     : 1;
                 const nextId = "REQ-" + String(nextIdNum).padStart(3, '0');
 
-                const newRequest = {
+                targetRequest = {
                     id: nextId,
                     requester,
                     branch,
@@ -1802,45 +1914,22 @@ function doPost(e) {
                     date: today
                 };
 
-                state.requests.push(newRequest);
+                state.requests.push(targetRequest);
                 saveToLocalStorage();
-
-                // REALTIME GOOGLE SHEETS API SYNCING
-                if (state.sheetsUrl) {
-                    showNotification("Mengirim Data...", "Sedang menyinkronkan data dengan Google Spreadsheet...", "info");
-                    
-                    try {
-                        // Persiapkan data kiriman, hilangkan string base64 berat dari payload Sheets agar tidak meluap
-                        const sheetsPayload = { ...newRequest };
-                        if (sheetsPayload.image) {
-                            sheetsPayload.image = "[Gambar Tersimpan di Aplikasi Lokal]"; // Placeholder keterangan gambar untuk sel spreadsheet
-                        }
-
-                        const response = await fetch(state.sheetsUrl, {
-                            method: "POST",
-                            mode: "no-cors", 
-                            headers: {
-                                "Content-Type": "text/plain;charset=utf-8",
-                            },
-                            body: JSON.stringify(sheetsPayload)
-                        });
-                        
-                        showNotification("Tersinkronisasi!", `Data baru ${nextId} berhasil terkirim ke Google Sheets!`, "success");
-                    } catch (error) {
-                        console.error("Sheets sync failed:", error);
-                        showNotification("Koneksi Gagal", "Gagal mengirim data ke Sheets, data tetap aman tersimpan secara lokal.", "error");
-                    }
-                } else {
-                    showNotification("Berhasil Disimpan", `Data baru tersimpan secara lokal dengan ID ${nextId}.`, "success");
-                }
+                showNotification("Berhasil Disimpan", `Data baru tersimpan secara lokal dengan ID ${nextId}.`, "success");
             }
 
-            // Clean UI Close and redraw
+            // Integrasi Cloud Lintas Perangkat (POST ke Google Sheets)
+            if (state.sheetsUrl && targetRequest) {
+                showNotification("Menyinkronkan...", "Mengirim pembaruan ke Google Spreadsheet...", "info");
+                await pushCloudAction("saveRequest", { payload: targetRequest });
+                showNotification("Cloud Sinkron!", `Pembaruan data ${targetRequest.id} berhasil tersimpan ke Google Sheets!`, "success");
+            }
+
             document.getElementById("request-modal").classList.add("hidden");
             renderDashboard();
         }
 
-        // Action Trigger for Editing single item
         function editRequest(id) {
             const item = state.requests.find(r => r.id === id);
             if (item) {
@@ -1848,23 +1937,27 @@ function doPost(e) {
             }
         }
 
-        // Action Trigger for Deleting single item (Buka Modal Kustom)
         function deleteRequest(id) {
             state.pendingDeleteId = id;
             document.getElementById("delete-item-id-label").textContent = id;
             document.getElementById("delete-confirm-modal").classList.remove("hidden");
         }
 
-        // Eksekusi hapus setelah dikonfirmasi di modal kustom
-        function confirmDeleteRequest(id) {
+        async function confirmDeleteRequest(id) {
             state.requests = state.requests.filter(r => r.id !== id);
             saveToLocalStorage();
             renderDashboard();
             
             document.getElementById("delete-confirm-modal").classList.add("hidden");
             state.pendingDeleteId = null;
-            
-            showNotification("Berhasil Dihapus", `Pengajuan ${id} telah dihapus.`, "info");
+            showNotification("Berhasil Dihapus", `Pengajuan ${id} telah dihapus secara lokal.`, "info");
+
+            // Cloud Sync (POST delete action ke Google Sheets)
+            if (state.sheetsUrl) {
+                showNotification("Menghapus...", "Menghapus pengajuan di Google Spreadsheet...", "info");
+                await pushCloudAction("deleteRequest", { id: id });
+                showNotification("Cloud Sinkron!", `Pengajuan ${id} berhasil dihapus dari Google Sheets!`, "success");
+            }
         }
     </script>
 </body>
