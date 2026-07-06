@@ -161,12 +161,17 @@
                 <!-- Spreadsheet Connection Status Alert Banner -->
                 <div id="sheets-connection-banner" class="bg-indigo-50 border border-indigo-200 rounded-2xl p-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
                     <div class="flex items-start gap-3">
-                        <div class="p-2 bg-indigo-600 text-white rounded-xl mt-0.5 md:mt-0 flex-shrink-0">
+                        <div class="p-2 bg-indigo-600 text-white rounded-xl mt-0.5 md:mt-0 flex-shrink-0 animate-pulse">
                             <i data-lucide="database" class="w-5 h-5"></i>
                         </div>
                         <div>
                             <h3 class="font-bold text-slate-900 text-sm">Mode Penyimpanan Realtime Aktif</h3>
                             <p class="text-xs text-slate-600 mt-1">Data Anda disimpan secara lokal. Sambungkan ke **Google Spreadsheet** agar setiap kali diinput, data di spreadsheet Anda juga otomatis berubah secara live.</p>
+                            <!-- Error Warning Helper -->
+                            <div id="url-validation-warning" class="hidden mt-2 p-2 bg-rose-100 border border-rose-300 text-rose-800 text-[11px] rounded-lg flex items-center gap-1.5 font-medium">
+                                <i data-lucide="alert-triangle" class="w-4 h-4 text-rose-600 flex-shrink-0"></i>
+                                <span>Peringatan: URL yang dimasukkan tampaknya adalah link editor Apps Script, bukan Web App URL (/exec). Harap periksa kembali panduan!</span>
+                            </div>
                         </div>
                     </div>
                     <div class="flex items-center gap-2 w-full md:w-auto">
@@ -415,6 +420,30 @@
             </div>
         </div>
 
+        <!-- CUSTOM DELETE CONFIRMATION MODAL -->
+        <div id="delete-confirm-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4">
+            <!-- Backdrop -->
+            <div class="absolute inset-0 bg-slate-900/50 backdrop-blur-sm"></div>
+            <!-- Content -->
+            <div class="relative bg-white rounded-2xl shadow-xl w-full max-w-md border border-slate-200 overflow-hidden transform transition-all">
+                <div class="p-6 text-center">
+                    <div class="inline-flex p-3 bg-rose-50 text-rose-600 rounded-full mb-4">
+                        <i data-lucide="trash-2" class="w-8 h-8"></i>
+                    </div>
+                    <h3 class="text-lg font-bold text-slate-900">Konfirmasi Hapus</h3>
+                    <p class="text-sm text-slate-500 mt-2">Apakah Anda benar-benar yakin ingin menghapus pengajuan <span id="delete-item-id-label" class="font-bold text-slate-800"></span>? Tindakan ini tidak bisa dibatalkan.</p>
+                </div>
+                <div class="p-4 bg-slate-50 border-t border-slate-100 flex items-center justify-center gap-3">
+                    <button type="button" id="btn-cancel-delete" class="flex-1 py-2 border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-sm font-semibold rounded-xl transition-all">
+                        Batalkan
+                    </button>
+                    <button type="button" id="btn-confirm-delete" class="flex-1 py-2 bg-rose-600 hover:bg-rose-700 text-white text-sm font-semibold rounded-xl transition-all shadow-md shadow-rose-600/10">
+                        Ya, Hapus Data
+                    </button>
+                </div>
+            </div>
+        </div>
+
         <!-- SPREADSHEET SYNC GUIDE MODAL -->
         <div id="sync-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4">
             <div class="absolute inset-0 bg-slate-900/50 backdrop-blur-sm"></div>
@@ -518,13 +547,14 @@ function doPost(e) {
                         <div class="flex gap-3">
                             <div class="flex-shrink-0 w-6 h-6 bg-slate-100 text-slate-700 rounded-full flex items-center justify-center text-xs font-bold mt-0.5">4</div>
                             <div>
-                                <p class="font-semibold text-slate-800">Deploy sebagai Aplikasi Web</p>
+                                <p class="font-semibold text-slate-800">Deploy sebagai Aplikasi Web (PENTING!)</p>
                                 <p class="text-xs text-slate-500 mt-1">
-                                    1. Klik tombol **Deploy (Terapkan)** -> **New Deployment (Penerapan Baru)**.<br>
+                                    1. Klik tombol **Deploy (Terapkan)** di kanan atas -> **New Deployment (Penerapan Baru)**.<br>
                                     2. Pilih jenis konfigurasi sebagai **Web App (Aplikasi Web)**.<br>
-                                    3. Ubah kolom "Who has access" menjadi **Anyone (Siapa saja)**.<br>
-                                    4. Klik **Deploy** dan setujui izin akses akun Anda.<br>
-                                    5. Salin **Web App URL** yang dihasilkan.
+                                    3. Ubah kolom *"Execute as"* menjadi **Me (Email Anda)**.<br>
+                                    4. <span class="font-bold text-rose-600">PENTING:</span> Ubah kolom *"Who has access"* menjadi **Anyone (Siapa saja)**. Jika ini salah, data tidak akan bisa masuk.<br>
+                                    5. Klik **Deploy**, klik **Authorize Access**, dan setujui izin akses akun Google Anda.<br>
+                                    6. Salin **Web App URL** yang dihasilkan (pastikan link berakhiran <code class="font-mono bg-slate-100 text-slate-700 px-1">/exec</code>, bukan <code class="font-mono bg-slate-100 text-slate-700 px-1">/edit</code>).
                                 </p>
                             </div>
                         </div>
@@ -659,7 +689,8 @@ function doPost(e) {
             sheetsUrl: localStorage.getItem("erequest_sheets_url") || "",
             activeFilterCategory: "ALL",
             activeFilterStatus: "ALL",
-            searchQuery: ""
+            searchQuery: "",
+            pendingDeleteId: null
         };
 
         // Initialize App
@@ -675,7 +706,9 @@ function doPost(e) {
 
             // Sync Web App URL on initialization
             if (state.sheetsUrl) {
-                document.getElementById("spreadsheet-url-input").value = state.sheetsUrl;
+                const urlInput = document.getElementById("spreadsheet-url-input");
+                urlInput.value = state.sheetsUrl;
+                validateUrlFormat(state.sheetsUrl);
             }
 
             // Initialize Lucide Icons
@@ -693,6 +726,23 @@ function doPost(e) {
         // Save database state locally
         function saveToLocalStorage() {
             localStorage.setItem("erequest_data", JSON.stringify(state.requests));
+        }
+
+        // Helper untuk memvalidasi apakah link Web App atau Editor
+        function validateUrlFormat(url) {
+            const warningBox = document.getElementById("url-validation-warning");
+            if (!url) {
+                warningBox.classList.add("hidden");
+                return true;
+            }
+            // Link Apps script editor biasanya mengandung /edit
+            if (url.includes("/edit") || !url.includes("/exec")) {
+                warningBox.classList.remove("hidden");
+                return false;
+            } else {
+                warningBox.classList.add("hidden");
+                return true;
+            }
         }
 
         // Trigger notifications to UI
@@ -731,7 +781,7 @@ function doPost(e) {
                 setTimeout(() => {
                     toast.classList.add("hidden");
                 }, 300);
-            }, 4000);
+            }, 4500);
         }
 
         // Format Currency Helper
@@ -781,8 +831,14 @@ function doPost(e) {
                 state.sheetsUrl = urlInput;
                 localStorage.setItem("erequest_sheets_url", urlInput);
                 
+                const isValid = validateUrlFormat(urlInput);
+                
                 if (urlInput) {
-                    showNotification("Spreadsheet Terkoneksi!", "Integrasi realtime telah siap dijalankan.", "success");
+                    if (isValid) {
+                        showNotification("Spreadsheet Terkoneksi!", "Integrasi realtime telah siap dijalankan.", "success");
+                    } else {
+                        showNotification("Peringatan Link!", "Tampaknya Anda memasukkan URL yang salah. Harap baca petunjuk.", "error");
+                    }
                 } else {
                     showNotification("Koneksi Dinonaktifkan", "Penyimpanan kembali menggunakan memori lokal.", "info");
                 }
@@ -835,6 +891,18 @@ function doPost(e) {
                     document.getElementById("sync-modal").classList.add("hidden");
                     document.getElementById("github-modal").classList.add("hidden");
                 });
+            });
+
+            // Custom Delete Confirmation Modal Listeners
+            document.getElementById("btn-cancel-delete").addEventListener("click", () => {
+                document.getElementById("delete-confirm-modal").classList.add("hidden");
+                state.pendingDeleteId = null;
+            });
+
+            document.getElementById("btn-confirm-delete").addEventListener("click", () => {
+                if (state.pendingDeleteId) {
+                    confirmDeleteRequest(state.pendingDeleteId);
+                }
             });
 
             // Copy Apps Script Clipboard Action
@@ -1041,7 +1109,7 @@ function doPost(e) {
                         requester, department, itemName, category, urgency, quantity, price, status
                     };
                     saveToLocalStorage();
-                    showNotification("Berhasil Diupdate", `Pengajuan ${editId} berhasil diubah.`, "success");
+                    showNotification("Berhasil Diupdate", `Pengajuan ${editId} berhasil diubah secara lokal.`, "success");
                 }
             } else {
                 // CREATE NEW REQUEST
@@ -1072,21 +1140,20 @@ function doPost(e) {
                     showNotification("Mengirim Data...", "Sedang menyinkronkan data dengan Google Spreadsheet...", "info");
                     
                     try {
-                        // We use direct POST with no-cors or JSON payload depending on implementation.
-                        // Standard Google Apps Script responds beautifully with standard fetch configurations.
+                        // Menggunakan Content-Type: text/plain untuk mencegah CORS preflight precheck block
                         const response = await fetch(state.sheetsUrl, {
                             method: "POST",
-                            mode: "no-cors", // Crucial block for cors bypass inside generic web apps
+                            mode: "no-cors", 
                             headers: {
-                                "Content-Type": "application/json",
+                                "Content-Type": "text/plain;charset=utf-8",
                             },
                             body: JSON.stringify(newRequest)
                         });
                         
-                        showNotification("Tersinkronisasi!", `Data baru berhasil ditambahkan secara realtime ke Google Sheet Anda!`, "success");
+                        showNotification("Tersinkronisasi!", `Data baru ${nextId} berhasil dikirim secara realtime ke Google Sheet Anda!`, "success");
                     } catch (error) {
                         console.error("Spreadsheet sync failed:", error);
-                        showNotification("Gagal Sinkron", "Periksa koneksi atau validasi URL Apps Script Anda.", "error");
+                        showNotification("Gagal Sinkron", "Gagal menghubungi server Google. Periksa koneksi atau URL Apps Script Anda.", "error");
                     }
                 } else {
                     showNotification("Berhasil Dibuat", `Data baru tersimpan di browser Anda dengan ID ${nextId}.`, "success");
@@ -1106,16 +1173,23 @@ function doPost(e) {
             }
         }
 
-        // Action Trigger for Deleting single item
+        // Action Trigger for Deleting single item (Buka Modal Kustom)
         function deleteRequest(id) {
-            // Standard elegant confirm bypass inside Canvas Web UI
-            const confirmDelete = confirm(`Apakah Anda yakin ingin menghapus data pengajuan ${id}?`);
-            if (confirmDelete) {
-                state.requests = state.requests.filter(r => r.id !== id);
-                saveToLocalStorage();
-                renderDashboard();
-                showNotification("Berhasil Dihapus", `Pengajuan ${id} berhasil dihapus dari database.`, "info");
-            }
+            state.pendingDeleteId = id;
+            document.getElementById("delete-item-id-label").textContent = id;
+            document.getElementById("delete-confirm-modal").classList.remove("hidden");
+        }
+
+        // Eksekusi hapus setelah dikonfirmasi di modal kustom
+        function confirmDeleteRequest(id) {
+            state.requests = state.requests.filter(r => r.id !== id);
+            saveToLocalStorage();
+            renderDashboard();
+            
+            document.getElementById("delete-confirm-modal").classList.add("hidden");
+            state.pendingDeleteId = null;
+            
+            showNotification("Berhasil Dihapus", `Pengajuan ${id} berhasil dihapus dari database lokal.`, "info");
         }
     </script>
 </body>
