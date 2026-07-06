@@ -1,1177 +1,1236 @@
-<!DOCTYPE html>
-<html lang="id">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>E-Request Items Dashboard 2026</title>
-    <!-- Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <!-- FontAwesome Icons -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <!-- Chart.js -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <!-- PapaParse (Untuk membaca CSV Google Sheets secara real-time) -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
-    
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    colors: {
-                        primary: {
-                            50: '#f0f9ff',
-                            100: '#e0f2fe',
-                            500: '#0284c7',
-                            600: '#0369a1',
-                            700: '#075985',
-                            900: '#0c4a6e',
-                        }
-                    }
-                }
-            }
-        }
-    </script>
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap');
-        body {
-            font-family: 'Plus Jakarta Sans', sans-serif;
-        }
-        .custom-scrollbar::-webkit-scrollbar {
-            width: 6px;
-            height: 6px;
-        }
-        .custom-scrollbar::-webkit-scrollbar-track {
-            background: #f1f1f1;
-        }
-        .custom-scrollbar::-webkit-scrollbar-thumb {
-            background: #cbd5e1;
-            border-radius: 4px;
-        }
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-            background: #94a3b8;
-        }
-    </style>
-</head>
-<body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col">
+import React, { useState, useEffect } from 'react';
+import { initializeApp } from 'firebase/app';
+import { 
+  getAuth, 
+  signInAnonymously, 
+  signInWithCustomToken, 
+  onAuthStateChanged 
+} from 'firebase/auth';
+import { 
+  getFirestore, 
+  collection, 
+  doc, 
+  setDoc, 
+  addDoc, 
+  updateDoc, 
+  deleteDoc, 
+  onSnapshot, 
+  query 
+} from 'firebase/firestore';
+import { 
+  Plus, 
+  TrendingUp, 
+  CheckCircle, 
+  XCircle, 
+  Clock, 
+  FileText, 
+  Users, 
+  LogOut, 
+  Send, 
+  MessageSquare, 
+  Search, 
+  Filter, 
+  Sliders, 
+  Trash2, 
+  Edit3, 
+  Info,
+  DollarSign,
+  Layers,
+  MapPin,
+  Calendar
+} from 'lucide-react';
 
-    <!-- Top Navigation Bar -->
-    <header class="bg-white border-b border-slate-200 sticky top-0 z-40 px-4 py-3 sm:px-6 flex justify-between items-center shadow-sm">
-        <div class="flex items-center space-x-3">
-            <div class="bg-primary-600 text-white p-2 rounded-xl">
-                <i class="fa-solid fa-boxes-stacked text-xl"></i>
+// --- FIREBASE CONFIGURATION ---
+// Menggunakan konfigurasi dinamis yang disediakan oleh environment atau fallback ke objek kosong
+const firebaseConfig = typeof __firebase_config !== 'undefined' 
+  ? JSON.parse(__firebase_config) 
+  : {
+      apiKey: "",
+      authDomain: "mock-project.firebaseapp.com",
+      projectId: "mock-project",
+      storageBucket: "mock-project.appspot.com",
+      messagingSenderId: "12345678",
+      appId: "1:12345678:web:123"
+    };
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+const appId = typeof __app_id !== 'undefined' ? __app_id : 'req-system-v1';
+
+// Daftar Role Pengguna yang Tersedia untuk Simulasi/Akun
+const ROLES = {
+  STAFF: { id: 'staff', name: 'Pemohon / Staff (PIC)', desc: 'Bisa membuat & melihat pengajuan sendiri' },
+  MANAGER: { id: 'manager', name: 'Manager / Approver', desc: 'Bisa menyetujui / menolak pengajuan' },
+  FINANCE: { id: 'finance', name: 'Finance / Purchasing', desc: 'Bisa input harga, update status, & kelola semua data' }
+};
+
+export default function App() {
+  // Authentication & User States
+  const [user, setUser] = useState(null);
+  const [currentRole, setCurrentRole] = useState('staff'); // default role untuk simulasi
+  const [userProfile, setUserProfile] = useState({
+    name: 'Budi Santoso',
+    cabang: 'Jakarta Pusat',
+    divisi: 'IT Support',
+    whatsapp: '6281234567890'
+  });
+
+  // Data States
+  const [requests, setRequests] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [errorMsg, setErrorMsg] = useState(null);
+
+  // Filter & Search States
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState('All');
+  const [categoryFilter, setCategoryFilter] = useState('All');
+
+  // Form Modal States
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+  const [selectedRequest, setSelectedRequest] = useState(null);
+  
+  // Form Input States
+  const [formData, setFormData] = useState({
+    tglTerakhirPembelian: '',
+    cabang: '',
+    pemohon: '',
+    divisi: '',
+    kategori: 'IT/Elektronik',
+    namaBarang: '',
+    qty: 1,
+    alasanUrgensi: 'Normal', // Normal, Tinggi, Sangat Mendesak
+    media: 'Email', // Tokopedia, Shopee, Offline Store, Email, dll
+    notes: '',
+    whatsapp: '',
+    harga: 0
+  });
+
+  // Update Form ketika profil user berubah
+  useEffect(() => {
+    if (userProfile) {
+      setFormData(prev => ({
+        ...prev,
+        pemohon: userProfile.name,
+        cabang: userProfile.cabang,
+        divisi: userProfile.divisi,
+        whatsapp: userProfile.whatsapp
+      }));
+    }
+  }, [userProfile]);
+
+  // --- FIREBASE AUTHENTICATION (RULE 3) ---
+  useEffect(() => {
+    const initAuth = async () => {
+      try {
+        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+          await signInWithCustomToken(auth, __initial_auth_token);
+        } else {
+          await signInAnonymously(auth);
+        }
+      } catch (err) {
+        console.error("Auth error:", err);
+        setErrorMsg("Gagal mengautentikasi ke sistem. Silakan muat ulang halaman.");
+      }
+    };
+    initAuth();
+
+    const unsubscribe = onAuthStateChanged(auth, (usr) => {
+      setUser(usr);
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  // --- FIRESTORE REALTIME SYNC (RULE 1 & 2) ---
+  useEffect(() => {
+    if (!user) return;
+
+    setLoading(true);
+    // Menggunakan path sesuai RULE 1 untuk data publik agar bisa berkolaborasi antar role
+    const publicDataCollection = collection(db, 'artifacts', appId, 'public', 'data', 'requests');
+
+    // Sesuai RULE 2: No Complex Queries (order/where ditiadakan di query Firestore, sorting dilakukan di memory JS)
+    const unsubscribe = onSnapshot(
+      publicDataCollection,
+      (snapshot) => {
+        const dataList = [];
+        snapshot.forEach((doc) => {
+          dataList.push({ id: doc.id, ...doc.data() });
+        });
+        
+        // Sorting di memory JS berdasarkan tanggal request terbaru
+        dataList.sort((a, b) => new Date(b.tglRequest) - new Date(a.tglRequest));
+        setRequests(dataList);
+        setLoading(false);
+      },
+      (error) => {
+        console.error("Firestore error:", error);
+        setErrorMsg("Gagal memuat data dari database. Pastikan koneksi internet stabil.");
+        setLoading(false);
+      }
+    );
+
+    return () => unsubscribe();
+  }, [user]);
+
+  // --- ACTIONS HANDLERS ---
+  
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: name === 'qty' || name === 'harga' ? Number(value) : value
+    }));
+  };
+
+  const handleProfileChange = (e) => {
+    const { name, value } = e.target;
+    setUserProfile(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  const handleOpenNewRequest = () => {
+    setFormData({
+      tglTerakhirPembelian: '',
+      cabang: userProfile.cabang,
+      pemohon: userProfile.name,
+      divisi: userProfile.divisi,
+      kategori: 'IT/Elektronik',
+      namaBarang: '',
+      qty: 1,
+      alasanUrgensi: 'Normal',
+      media: 'Online Store',
+      notes: '',
+      whatsapp: userProfile.whatsapp,
+      harga: 0
+    });
+    setIsModalOpen(true);
+  };
+
+  // Submit Permintaan Baru
+  const handleSubmitRequest = async (e) => {
+    e.preventDefault();
+    if (!user) return;
+
+    try {
+      const newRequest = {
+        ...formData,
+        tglRequest: new Date().toISOString().split('T')[0], // Hari ini
+        status: 'Pending', // Status Awal: Pending, Approved, Rejected, Completed
+        createdBy: user.uid,
+        historyLog: [
+          {
+            status: 'Pending',
+            time: new Date().toISOString(),
+            note: 'Permintaan barang berhasil dibuat.',
+            by: userProfile.name
+          }
+        ]
+      };
+
+      const publicDataCollection = collection(db, 'artifacts', appId, 'public', 'data', 'requests');
+      await addDoc(publicDataCollection, newRequest);
+      
+      setIsModalOpen(false);
+      // Custom notification / message
+      showBannerNotification("Permintaan baru berhasil dikirim!");
+    } catch (err) {
+      console.error("Submit error:", err);
+      alert("Gagal mengirim permintaan. Coba beberapa saat lagi.");
+    }
+  };
+
+  // Update Status Permintaan (Untuk Manager / Finance)
+  const handleUpdateStatus = async (requestId, newStatus, additionalNote = '') => {
+    if (!user) return;
+
+    try {
+      const requestDoc = doc(db, 'artifacts', appId, 'public', 'data', 'requests', requestId);
+      const targetReq = requests.find(r => r.id === requestId);
+      if (!targetReq) return;
+
+      const updatedHistory = [
+        ...(targetReq.historyLog || []),
+        {
+          status: newStatus,
+          time: new Date().toISOString(),
+          note: additionalNote || `Status diubah menjadi ${newStatus}`,
+          by: `${userProfile.name} (${currentRole.toUpperCase()})`
+        }
+      ];
+
+      await updateDoc(requestDoc, {
+        status: newStatus,
+        historyLog: updatedHistory
+      });
+
+      if (selectedRequest && selectedRequest.id === requestId) {
+        setSelectedRequest(prev => ({
+          ...prev,
+          status: newStatus,
+          historyLog: updatedHistory
+        }));
+      }
+
+      showBannerNotification(`Status berhasil diperbarui menjadi ${newStatus}!`);
+    } catch (err) {
+      console.error("Update status error:", err);
+      alert("Gagal memperbarui status.");
+    }
+  };
+
+  // Update Harga & Note Khusus (Untuk Finance)
+  const handleUpdateFinanceDetails = async (requestId, harga, notes) => {
+    if (!user) return;
+
+    try {
+      const requestDoc = doc(db, 'artifacts', appId, 'public', 'data', 'requests', requestId);
+      const targetReq = requests.find(r => r.id === requestId);
+      if (!targetReq) return;
+
+      const updatedHistory = [
+        ...(targetReq.historyLog || []),
+        {
+          status: targetReq.status,
+          time: new Date().toISOString(),
+          note: `Finance memperbarui rincian harga menjadi Rp ${harga.toLocaleString('id-ID')} dan menambahkan catatan.`,
+          by: `${userProfile.name} (FINANCE)`
+        }
+      ];
+
+      await updateDoc(requestDoc, {
+        harga: Number(harga),
+        notes: notes,
+        historyLog: updatedHistory
+      });
+
+      if (selectedRequest && selectedRequest.id === requestId) {
+        setSelectedRequest(prev => ({
+          ...prev,
+          harga: Number(harga),
+          notes: notes,
+          historyLog: updatedHistory
+        }));
+      }
+
+      showBannerNotification("Rincian pembayaran & catatan berhasil diperbarui!");
+    } catch (err) {
+      console.error("Update finance error:", err);
+      alert("Gagal memperbarui rincian finansial.");
+    }
+  };
+
+  // Delete Request (Finance Only / Owner if still pending)
+  const handleDeleteRequest = async (requestId) => {
+    if (!user) return;
+    
+    const confirmDelete = window.confirm("Apakah Anda yakin ingin menghapus permintaan ini secara permanen?");
+    if (!confirmDelete) return;
+
+    try {
+      const requestDoc = doc(db, 'artifacts', appId, 'public', 'data', 'requests', requestId);
+      await deleteDoc(requestDoc);
+      setIsDetailModalOpen(false);
+      showBannerNotification("Permintaan berhasil dihapus.");
+    } catch (err) {
+      console.error("Delete error:", err);
+      alert("Gagal menghapus data.");
+    }
+  };
+
+  // Helper Banner Notification (no browser alert)
+  const [notification, setNotification] = useState(null);
+  const showBannerNotification = (msg) => {
+    setNotification(msg);
+    setTimeout(() => {
+      setNotification(null);
+    }, 4000);
+  };
+
+  // WhatsApp Helper
+  const sendWhatsAppMessage = (req) => {
+    const formattedPhone = req.whatsapp.startsWith('0') 
+      ? '62' + req.whatsapp.slice(1) 
+      : req.whatsapp;
+    
+    const message = `Halo ${req.pemohon}, saya ingin mengonfirmasi permintaan barang berikut:\n\n` +
+      `*Nama Barang:* ${req.namaBarang}\n` +
+      `*Kategori:* ${req.kategori}\n` +
+      `*Jumlah (Qty):* ${req.qty}\n` +
+      `*Status Saat Ini:* ${req.status}\n` +
+      `*Harga:* Rp ${req.harga ? req.harga.toLocaleString('id-ID') : 'Belum diisi'}\n\n` +
+      `Mohon tunggu info selanjutnya ya. Terima kasih!`;
+    
+    const encodedMessage = encodeURIComponent(message);
+    window.open(`https://wa.me/${formattedPhone}?text=${encodedMessage}`, '_blank');
+  };
+
+  // --- FILTERING & SEARCHING (Memory JS) ---
+  const filteredRequests = requests.filter(req => {
+    const matchesSearch = 
+      req.namaBarang.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      req.pemohon.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      req.cabang.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      req.divisi.toLowerCase().includes(searchTerm.toLowerCase());
+
+    const matchesStatus = statusFilter === 'All' || req.status === statusFilter;
+    const matchesCategory = categoryFilter === 'All' || req.kategori === categoryFilter;
+
+    // Untuk role STAFF biasa, filter agar hanya melihat buatannya sendiri (simulasi privasi)
+    // Namun untuk MANAGER dan FINANCE bisa melihat semua
+    const matchesRoleScope = currentRole === 'staff' ? req.createdBy === user?.uid : true;
+
+    return matchesSearch && matchesStatus && matchesCategory && matchesRoleScope;
+  });
+
+  // --- STATS COMPUTATION ---
+  const stats = {
+    total: filteredRequests.length,
+    pending: filteredRequests.filter(r => r.status === 'Pending').length,
+    approved: filteredRequests.filter(r => r.status === 'Approved').length,
+    rejected: filteredRequests.filter(r => r.status === 'Rejected').length,
+    completed: filteredRequests.filter(r => r.status === 'Completed').length,
+    totalBudget: filteredRequests.reduce((sum, r) => sum + (r.harga || 0) * (r.qty || 1), 0)
+  };
+
+  return (
+    <div className="min-h-screen bg-slate-50 text-slate-900 font-sans transition-colors duration-200 dark:bg-slate-900 dark:text-slate-100">
+      
+      {/* Banner Notifikasi */}
+      {notification && (
+        <div className="fixed top-4 right-4 z-50 bg-emerald-600 text-white px-5 py-3 rounded-lg shadow-2xl flex items-center gap-2 animate-bounce border border-emerald-500">
+          <CheckCircle className="w-5 h-5" />
+          <span className="font-medium text-sm">{notification}</span>
+        </div>
+      )}
+
+      {/* HEADER UTAMA */}
+      <header className="bg-white border-b border-slate-200 sticky top-0 z-30 dark:bg-slate-800 dark:border-slate-700">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="bg-indigo-600 text-white p-2 rounded-lg">
+              <TrendingUp className="w-6 h-6" />
             </div>
             <div>
-                <h1 class="font-bold text-lg text-slate-900 tracking-tight leading-tight">E-Request Items</h1>
-                <p class="text-xs text-slate-500 font-medium">Database Integrator & Executive Dashboard</p>
+              <h1 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white">ReqBarang</h1>
+              <p className="text-xs text-slate-500 dark:text-slate-400">Sistem Permintaan Barang Internal</p>
             </div>
+          </div>
+
+          {/* SIMULASI ROLE & USER PROFILE PANEL */}
+          <div className="flex items-center gap-4">
+            {/* Pemilihan Role Aktif (Untuk testing) */}
+            <div className="hidden md:flex items-center bg-slate-100 p-1 rounded-lg border border-slate-200 dark:bg-slate-700 dark:border-slate-600">
+              <span className="text-xs font-semibold px-2 text-slate-500 dark:text-slate-400">Role Aktif:</span>
+              {Object.keys(ROLES).map((key) => (
+                <button
+                  key={ROLES[key].id}
+                  onClick={() => setCurrentRole(ROLES[key].id)}
+                  className={`text-xs px-3 py-1.5 rounded-md font-medium transition-all ${
+                    currentRole === ROLES[key].id
+                      ? 'bg-indigo-600 text-white shadow-sm'
+                      : 'text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white'
+                  }`}
+                  title={ROLES[key].desc}
+                >
+                  {ROLES[key].name.split(' ')[0]}
+                </button>
+              ))}
+            </div>
+
+            {/* Profile Singkat */}
+            <div className="flex items-center gap-2 pl-4 border-l border-slate-200 dark:border-slate-700">
+              <div className="text-right">
+                <p className="text-sm font-semibold leading-none">{userProfile.name}</p>
+                <span className="text-[10px] bg-indigo-100 text-indigo-800 px-2 py-0.5 rounded-full font-bold uppercase dark:bg-indigo-900 dark:text-indigo-200">
+                  {currentRole}
+                </span>
+              </div>
+              <div className="w-10 h-10 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center font-bold text-indigo-600 dark:text-indigo-400 border-2 border-indigo-500">
+                {userProfile.name.charAt(0)}
+              </div>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      {/* MAIN CONTAINER */}
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        
+        {/* WARNING JIKA ERROR */}
+        {errorMsg && (
+          <div className="mb-6 p-4 bg-rose-50 border-l-4 border-rose-500 text-rose-800 rounded-r-lg flex items-center gap-3 dark:bg-rose-950 dark:text-rose-200">
+            <XCircle className="w-6 h-6 flex-shrink-0" />
+            <p className="text-sm font-medium">{errorMsg}</p>
+          </div>
+        )}
+
+        {/* TOP INTERACTIVE BANNER: SIMULASI PENGGUNA */}
+        <div className="bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded-2xl p-6 shadow-lg mb-8 relative overflow-hidden">
+          <div className="absolute top-0 right-0 transform translate-x-12 -translate-y-12 opacity-10">
+            <FileText className="w-96 h-96" />
+          </div>
+          <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+            <div>
+              <h2 className="text-2xl font-extrabold mb-1">Selamat Datang di Portal Pengadaan Barang</h2>
+              <p className="text-indigo-100 text-sm max-w-xl">
+                Ajukan barang yang Anda butuhkan untuk kelancaran operasional kerja. Pantau status, ubah rincian, dan lakukan komunikasi cepat via WhatsApp.
+              </p>
+              
+              {/* Profile Configurator (Inline) */}
+              <div className="mt-4 flex flex-wrap gap-2 text-xs bg-black bg-opacity-20 p-2.5 rounded-lg max-w-2xl">
+                <span className="font-bold self-center">Ubah Identitas Anda:</span>
+                <input 
+                  type="text" 
+                  name="name" 
+                  value={userProfile.name} 
+                  onChange={handleProfileChange} 
+                  placeholder="Nama PIC" 
+                  className="bg-white text-slate-800 px-2 py-1 rounded w-32 outline-none border-none text-xs"
+                />
+                <input 
+                  type="text" 
+                  name="cabang" 
+                  value={userProfile.cabang} 
+                  onChange={handleProfileChange} 
+                  placeholder="Cabang" 
+                  className="bg-white text-slate-800 px-2 py-1 rounded w-32 outline-none border-none text-xs"
+                />
+                <input 
+                  type="text" 
+                  name="divisi" 
+                  value={userProfile.divisi} 
+                  onChange={handleProfileChange} 
+                  placeholder="Divisi" 
+                  className="bg-white text-slate-800 px-2 py-1 rounded w-28 outline-none border-none text-xs"
+                />
+                <input 
+                  type="text" 
+                  name="whatsapp" 
+                  value={userProfile.whatsapp} 
+                  onChange={handleProfileChange} 
+                  placeholder="No WhatsApp" 
+                  className="bg-white text-slate-800 px-2 py-1 rounded w-32 outline-none border-none text-xs"
+                />
+              </div>
+            </div>
+
+            <div className="flex-shrink-0 flex flex-col sm:flex-row gap-3">
+              <button 
+                onClick={handleOpenNewRequest}
+                className="bg-white text-indigo-700 hover:bg-slate-100 px-5 py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition-transform active:scale-95 shadow-md text-sm"
+              >
+                <Plus className="w-5 h-5" /> Buat Permintaan Baru
+              </button>
+            </div>
+          </div>
         </div>
 
-        <div class="flex items-center space-x-4">
-            <!-- Connection Status -->
-            <div id="connectionBadge" class="hidden sm:flex items-center space-x-2 bg-emerald-50 text-emerald-700 px-3 py-1.5 rounded-full text-xs font-semibold border border-emerald-200">
-                <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                <span>Terhubung ke Google Sheets</span>
+        {/* STATISTIK DASHBOARD */}
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
+          
+          <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex flex-col justify-between dark:bg-slate-800 dark:border-slate-700">
+            <div className="flex justify-between items-center mb-2">
+              <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider dark:text-slate-400">Total Permintaan</span>
+              <FileText className="w-5 h-5 text-indigo-500" />
             </div>
-            <div id="localBadge" class="flex items-center space-x-2 bg-amber-50 text-amber-700 px-3 py-1.5 rounded-full text-xs font-semibold border border-amber-200">
-                <span class="w-2 h-2 rounded-full bg-amber-500"></span>
-                <span>Mode Demo (Lokal)</span>
+            <div>
+              <p className="text-2xl font-bold text-slate-900 dark:text-white">{stats.total}</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Item diajukan</p>
             </div>
+          </div>
 
-            <!-- Role Selector -->
-            <div class="relative">
-                <select id="roleSelector" onchange="switchRole(this.value)" class="bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-700 text-xs sm:text-sm font-semibold rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-primary-500 cursor-pointer">
-                    <option value="Executive">👤 Executive View</option>
-                    <option value="StoreManager">🏪 Store Manager</option>
-                    <option value="Staff">🛠️ PIC Staff</option>
-                </select>
+          <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex flex-col justify-between dark:bg-slate-800 dark:border-slate-700">
+            <div className="flex justify-between items-center mb-2">
+              <span className="text-xs font-semibold text-amber-500 uppercase tracking-wider">Menunggu (Pending)</span>
+              <Clock className="w-5 h-5 text-amber-500 animate-pulse" />
             </div>
+            <div>
+              <p className="text-2xl font-bold text-slate-900 dark:text-white">{stats.pending}</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Butuh persetujuan</p>
+            </div>
+          </div>
+
+          <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex flex-col justify-between dark:bg-slate-800 dark:border-slate-700">
+            <div className="flex justify-between items-center mb-2">
+              <span className="text-xs font-semibold text-emerald-500 uppercase tracking-wider">Disetujui</span>
+              <CheckCircle className="w-5 h-5 text-emerald-500" />
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-slate-900 dark:text-white">{stats.approved + stats.completed}</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Lanjut proses beli</p>
+            </div>
+          </div>
+
+          <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex flex-col justify-between dark:bg-slate-800 dark:border-slate-700">
+            <div className="flex justify-between items-center mb-2">
+              <span className="text-xs font-semibold text-rose-500 uppercase tracking-wider">Ditolak</span>
+              <XCircle className="w-5 h-5 text-rose-500" />
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-slate-900 dark:text-white">{stats.rejected}</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Tidak disetujui</p>
+            </div>
+          </div>
+
+          <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 col-span-2 lg:col-span-1 flex flex-col justify-between dark:bg-slate-800 dark:border-slate-700">
+            <div className="flex justify-between items-center mb-2">
+              <span className="text-xs font-semibold text-indigo-500 uppercase tracking-wider">Estimasi Total Biaya</span>
+              <DollarSign className="w-5 h-5 text-indigo-500" />
+            </div>
+            <div>
+              <p className="text-lg font-extrabold text-indigo-600 dark:text-indigo-400">
+                Rp {stats.totalBudget.toLocaleString('id-ID')}
+              </p>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Dari item yang berharga</p>
+            </div>
+          </div>
+
         </div>
-    </header>
 
-    <!-- Main Workspace -->
-    <div class="flex-1 flex flex-col lg:flex-row">
-        <!-- Sidebar Navigation -->
-        <aside class="w-full lg:w-64 bg-white border-r border-slate-200 lg:min-h-full p-4 flex flex-col justify-between">
-            <div class="space-y-1">
-                <p class="text-xxs font-bold text-slate-400 uppercase tracking-wider px-3 mb-2">Menu Utama</p>
-                <button onclick="switchTab('dashboard')" id="btn-tab-dashboard" class="w-full flex items-center space-x-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all bg-primary-50 text-primary-600">
-                    <i class="fa-solid fa-chart-line text-lg"></i>
-                    <span>Ringkasan Eksekutif</span>
-                </button>
-                <button onclick="switchTab('requests')" id="btn-tab-requests" class="w-full flex items-center space-x-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all text-slate-600 hover:bg-slate-50 hover:text-slate-900">
-                    <i class="fa-solid fa-list-check text-lg"></i>
-                    <span>Daftar Permintaan</span>
-                </button>
-                <button onclick="switchTab('new-request')" id="btn-tab-new-request" class="w-full flex items-center space-x-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all text-slate-600 hover:bg-slate-50 hover:text-slate-900">
-                    <i class="fa-solid fa-circle-plus text-lg"></i>
-                    <span>Buat Request Baru</span>
-                </button>
-
-                <p class="text-xxs font-bold text-slate-400 uppercase tracking-wider px-3 pt-6 mb-2">Konfigurasi</p>
-                <button onclick="switchTab('settings')" id="btn-tab-settings" class="w-full flex items-center space-x-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all text-slate-600 hover:bg-slate-50 hover:text-slate-900">
-                    <i class="fa-solid fa-database text-lg text-emerald-600"></i>
-                    <span class="text-emerald-700">Database Spreadsheet</span>
-                </button>
+        {/* FILTER & PENCARIAN PANEL */}
+        <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-200 mb-8 dark:bg-slate-800 dark:border-slate-700">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            
+            {/* Search Input */}
+            <div className="relative flex-1">
+              <Search className="w-5 h-5 text-slate-400 absolute left-3 top-1/2 transform -translate-y-1/2" />
+              <input 
+                type="text" 
+                placeholder="Cari berdasarkan nama barang, pemohon, cabang, atau divisi..." 
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent bg-slate-50 text-sm dark:bg-slate-700 dark:border-slate-600 dark:text-white"
+              />
             </div>
 
-            <!-- Developer / User Info Footer -->
-            <div class="border-t border-slate-100 pt-4 mt-6">
-                <div class="bg-slate-50 rounded-xl p-3 border border-slate-200">
-                    <div class="flex items-center space-x-2">
-                        <div class="w-2 h-2 bg-emerald-500 rounded-full"></div>
-                        <span class="text-xxs font-bold text-slate-500 uppercase tracking-wider">Aktivitas Sistem</span>
-                    </div>
-                    <p class="text-xs text-slate-700 font-bold mt-1" id="syncStatusText">Data Terakhir: Demo Lokal</p>
-                    <button onclick="syncData()" class="mt-2 w-full bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 rounded-lg text-xs py-1.5 font-bold flex items-center justify-center space-x-1 transition-all">
-                        <i class="fa-solid fa-arrows-rotate" id="syncSpinner"></i>
-                        <span>Sync Sekarang</span>
-                    </button>
-                </div>
+            {/* Filter Dropdowns */}
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="flex items-center gap-2">
+                <Sliders className="w-4 h-4 text-slate-400" />
+                <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider dark:text-slate-400">Filter:</span>
+              </div>
+
+              {/* Status */}
+              <select 
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="text-xs bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 outline-none focus:ring-1 focus:ring-indigo-500 dark:bg-slate-700 dark:border-slate-600 dark:text-white"
+              >
+                <option value="All">Semua Status</option>
+                <option value="Pending">Menunggu (Pending)</option>
+                <option value="Approved">Disetujui Manager</option>
+                <option value="Rejected">Ditolak</option>
+                <option value="Completed">Selesai (Dibeli)</option>
+              </select>
+
+              {/* Kategori */}
+              <select 
+                value={categoryFilter}
+                onChange={(e) => setCategoryFilter(e.target.value)}
+                className="text-xs bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 outline-none focus:ring-1 focus:ring-indigo-500 dark:bg-slate-700 dark:border-slate-600 dark:text-white"
+              >
+                <option value="All">Semua Kategori</option>
+                <option value="IT/Elektronik">IT/Elektronik</option>
+                <option value="Alat Tulis Kantor">Alat Tulis Kantor</option>
+                <option value="Operasional Kantor">Operasional Kantor</option>
+                <option value="Peralatan Dapur/Kebersihan">Peralatan Dapur/Kebersihan</option>
+                <option value="Lain-lain">Lain-lain</option>
+              </select>
             </div>
-        </aside>
 
-        <!-- Main Content View Area -->
-        <main class="flex-1 p-4 sm:p-6 lg:p-8 overflow-y-auto max-w-[1600px] mx-auto w-full">
-            
-            <!-- ALERT MESSAGE BOX -->
-            <div id="customAlert" class="hidden mb-6 p-4 rounded-xl border flex items-start space-x-3 transition-all duration-300">
-                <div id="alertIcon" class="mt-0.5"></div>
-                <div class="flex-1">
-                    <h4 id="alertTitle" class="font-bold text-sm"></h4>
-                    <p id="alertDesc" class="text-xs mt-1 text-slate-600"></p>
-                </div>
-                <button onclick="closeAlert()" class="text-slate-400 hover:text-slate-600">
-                    <i class="fa-solid fa-xmark"></i>
-                </button>
+          </div>
+        </div>
+
+        {/* DATA TABLE / LIST */}
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden dark:bg-slate-800 dark:border-slate-700">
+          
+          <div className="px-6 py-4 border-b border-slate-200 flex justify-between items-center dark:border-slate-700">
+            <h3 className="font-bold text-slate-800 dark:text-white">Daftar Permintaan Barang</h3>
+            <span className="text-xs bg-slate-100 text-slate-700 px-2.5 py-1 rounded-full font-medium dark:bg-slate-700 dark:text-slate-300">
+              Menampilkan {filteredRequests.length} data
+            </span>
+          </div>
+
+          {loading ? (
+            <div className="py-20 text-center">
+              <div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-indigo-500 border-t-transparent mb-4"></div>
+              <p className="text-slate-500 dark:text-slate-400">Menghubungkan & mengambil data dari cloud database...</p>
             </div>
+          ) : filteredRequests.length === 0 ? (
+            <div className="py-20 text-center px-4">
+              <FileText className="w-16 h-16 mx-auto text-slate-300 mb-4 dark:text-slate-600" />
+              <h4 className="text-lg font-bold text-slate-700 mb-1 dark:text-slate-300">Tidak ada pengajuan ditemukan</h4>
+              <p className="text-slate-500 text-sm max-w-md mx-auto mb-4 dark:text-slate-400">
+                Silakan ubah filter pencarian Anda atau buat pengajuan permintaan barang baru untuk memulai.
+              </p>
+              <button 
+                onClick={handleOpenNewRequest}
+                className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs px-4 py-2 rounded-lg"
+              >
+                Buat Permintaan Pertama
+              </button>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-600 uppercase tracking-wider dark:bg-slate-700/50 dark:border-slate-700 dark:text-slate-300">
+                    <th className="px-6 py-3">Tanggal Request</th>
+                    <th className="px-6 py-3">Barang & Kategori</th>
+                    <th className="px-6 py-3">Pemohon / PIC</th>
+                    <th className="px-6 py-3">Urgensi</th>
+                    <th className="px-6 py-3">Harga Satuan</th>
+                    <th className="px-6 py-3">Qty</th>
+                    <th className="px-6 py-3">Status</th>
+                    <th className="px-6 py-3 text-right">Aksi</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-200 dark:divide-slate-700 text-sm">
+                  {filteredRequests.map((req) => (
+                    <tr 
+                      key={req.id} 
+                      className="hover:bg-slate-50/80 dark:hover:bg-slate-700/30 transition-all cursor-pointer"
+                      onClick={() => { setSelectedRequest(req); setIsDetailModalOpen(true); }}
+                    >
+                      {/* Tanggal Request */}
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="font-semibold text-slate-900 dark:text-white">{req.tglRequest}</div>
+                        <div className="text-[10px] text-slate-500 dark:text-slate-400">Tgl Terakhir Beli: {req.tglTerakhirPembelian || 'Belum Pernah'}</div>
+                      </td>
 
-            <!-- ========================================== -->
-            <!-- TAB 1: EXECUTIVE DASHBOARD                 -->
-            <!-- ========================================== -->
-            <section id="tab-dashboard" class="space-y-6">
-                <!-- Overview Row -->
-                <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                    <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
-                        <div class="flex justify-between items-center">
-                            <span class="text-xs font-semibold text-slate-500">Total Request</span>
-                            <span class="bg-primary-50 text-primary-600 p-2 rounded-xl text-xs"><i class="fa-solid fa-file-invoice"></i></span>
+                      {/* Barang & Kategori */}
+                      <td className="px-6 py-4">
+                        <div className="font-bold text-indigo-600 dark:text-indigo-400">{req.namaBarang}</div>
+                        <span className="text-[11px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full font-medium dark:bg-slate-700 dark:text-slate-300">
+                          {req.kategori}
+                        </span>
+                      </td>
+
+                      {/* Pemohon / PIC */}
+                      <td className="px-6 py-4">
+                        <div className="font-semibold text-slate-900 dark:text-white">{req.pemohon}</div>
+                        <div className="text-xs text-slate-500 dark:text-slate-400">{req.divisi} - {req.cabang}</div>
+                      </td>
+
+                      {/* Alasan Urgensi */}
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className={`text-xs px-2.5 py-1 rounded-full font-bold ${
+                          req.alasanUrgensi === 'Sangat Mendesak' 
+                            ? 'bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-200'
+                            : req.alasanUrgensi === 'Tinggi'
+                            ? 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-200'
+                            : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200'
+                        }`}>
+                          {req.alasanUrgensi}
+                        </span>
+                      </td>
+
+                      {/* Harga Satuan */}
+                      <td className="px-6 py-4 whitespace-nowrap font-semibold">
+                        {req.harga ? `Rp ${req.harga.toLocaleString('id-ID')}` : <span className="text-slate-400 text-xs italic">Belum diisi</span>}
+                      </td>
+
+                      {/* Qty */}
+                      <td className="px-6 py-4 whitespace-nowrap font-bold text-center">
+                        {req.qty}
+                      </td>
+
+                      {/* Status */}
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className={`text-xs px-3 py-1 rounded-full font-extrabold tracking-wider uppercase inline-flex items-center gap-1.5 ${
+                          req.status === 'Pending' 
+                            ? 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-200'
+                            : req.status === 'Approved'
+                            ? 'bg-sky-100 text-sky-800 dark:bg-sky-950 dark:text-sky-200'
+                            : req.status === 'Completed'
+                            ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200'
+                            : 'bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-200'
+                        }`}>
+                          <span className={`w-2 h-2 rounded-full ${
+                            req.status === 'Pending' ? 'bg-amber-500' :
+                            req.status === 'Approved' ? 'bg-sky-500' :
+                            req.status === 'Completed' ? 'bg-emerald-500' : 'bg-rose-500'
+                          }`}></span>
+                          {req.status}
+                        </span>
+                      </td>
+
+                      {/* Aksi Pintasan */}
+                      <td className="px-6 py-4 whitespace-nowrap text-right" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex justify-end gap-2">
+                          <button 
+                            onClick={() => sendWhatsAppMessage(req)}
+                            className="bg-emerald-500 hover:bg-emerald-600 text-white p-1.5 rounded-lg transition-transform active:scale-95 flex items-center justify-center"
+                            title="Hubungi PIC via WhatsApp"
+                          >
+                            <MessageSquare className="w-4 h-4" />
+                          </button>
+                          <button 
+                            onClick={() => { setSelectedRequest(req); setIsDetailModalOpen(true); }}
+                            className="bg-indigo-50 text-indigo-600 hover:bg-indigo-100 p-1.5 rounded-lg dark:bg-indigo-950 dark:text-indigo-300 dark:hover:bg-indigo-900"
+                            title="Detail Lengkap"
+                          >
+                            <Info className="w-4 h-4" />
+                          </button>
                         </div>
-                        <div class="mt-4">
-                            <h3 class="text-2xl sm:text-3xl font-extrabold text-slate-900" id="stat-total-request">0</h3>
-                            <p class="text-xxs text-slate-400 mt-1">Keseluruhan item diajukan</p>
-                        </div>
-                    </div>
-
-                    <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
-                        <div class="flex justify-between items-center">
-                            <span class="text-xs font-semibold text-slate-500">Estimasi Biaya</span>
-                            <span class="bg-emerald-50 text-emerald-600 p-2 rounded-xl text-xs"><i class="fa-solid fa-wallet"></i></span>
-                        </div>
-                        <div class="mt-4">
-                            <h3 class="text-xl sm:text-2xl font-extrabold text-emerald-700" id="stat-total-cost">Rp 0</h3>
-                            <p class="text-xxs text-slate-400 mt-1">Total biaya pembelian disetujui</p>
-                        </div>
-                    </div>
-
-                    <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
-                        <div class="flex justify-between items-center">
-                            <span class="text-xs font-semibold text-slate-500">Perlu Tindakan</span>
-                            <span class="bg-amber-50 text-amber-600 p-2 rounded-xl text-xs"><i class="fa-solid fa-clock-rotate-left"></i></span>
-                        </div>
-                        <div class="mt-4">
-                            <h3 class="text-2xl sm:text-3xl font-extrabold text-amber-600" id="stat-pending-approval">0</h3>
-                            <p class="text-xxs text-slate-400 mt-1">Draft & Menunggu Approval</p>
-                        </div>
-                    </div>
-
-                    <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
-                        <div class="flex justify-between items-center">
-                            <span class="text-xs font-semibold text-slate-500">Selesai Diterima</span>
-                            <span class="bg-indigo-50 text-indigo-600 p-2 rounded-xl text-xs"><i class="fa-solid fa-circle-check"></i></span>
-                        </div>
-                        <div class="mt-4">
-                            <h3 class="text-2xl sm:text-3xl font-extrabold text-indigo-600" id="stat-received">0</h3>
-                            <p class="text-xxs text-slate-400 mt-1">Pesanan sukses terkirim ke Store</p>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Charts Area -->
-                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                    <!-- Cost by Category (Bar Chart) -->
-                    <div class="bg-white p-4 sm:p-6 rounded-2xl border border-slate-200 shadow-sm lg:col-span-2">
-                        <div class="flex justify-between items-center mb-4">
-                            <h4 class="font-bold text-slate-800 text-sm sm:text-base">Grafik Anggaran per Kategori</h4>
-                            <span class="text-xxs text-slate-400 font-bold uppercase">Rupiah (IDR)</span>
-                        </div>
-                        <div class="relative h-64 sm:h-80 w-full">
-                            <canvas id="categoryChart"></canvas>
-                        </div>
-                    </div>
-
-                    <!-- Status Distribution (Pie Chart) -->
-                    <div class="bg-white p-4 sm:p-6 rounded-2xl border border-slate-200 shadow-sm">
-                        <div class="flex justify-between items-center mb-4">
-                            <h4 class="font-bold text-slate-800 text-sm sm:text-base">Distribusi Status Request</h4>
-                            <span class="text-xxs text-slate-400 font-bold uppercase">Persentase</span>
-                        </div>
-                        <div class="relative h-64 sm:h-80 w-full flex justify-center items-center">
-                            <canvas id="statusChart"></canvas>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Store Summary Table Area -->
-                <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-                    <div class="p-5 border-b border-slate-100 flex justify-between items-center flex-wrap gap-2">
-                        <div>
-                            <h4 class="font-bold text-slate-900 text-base">Alokasi Biaya & Jumlah Request per Cabang</h4>
-                            <p class="text-xs text-slate-500">Rangkuman alokasi logistik real-time untuk seluruh gerai aktif</p>
-                        </div>
-                        <div class="flex items-center space-x-2">
-                            <label for="filterBulanDashboard" class="text-xs font-semibold text-slate-500">Bulan:</label>
-                            <select id="filterBulanDashboard" onchange="renderDashboard()" class="bg-slate-50 border border-slate-200 rounded-lg text-xs p-1.5 focus:outline-none focus:ring-1 focus:ring-primary-500">
-                                <option value="ALL">Semua Bulan</option>
-                                <option value="05">Mei 2026</option>
-                                <option value="06">Juni 2026</option>
-                                <option value="07">Juli 2026</option>
-                            </select>
-                        </div>
-                    </div>
-                    <div class="overflow-x-auto custom-scrollbar">
-                        <table class="w-full text-left text-xs border-collapse">
-                            <thead>
-                                <tr class="bg-slate-50 text-slate-500 uppercase tracking-wider border-b border-slate-100">
-                                    <th class="py-3 px-4 font-bold">Cabang (Store)</th>
-                                    <th class="py-3 px-4 font-bold text-center">Total Request</th>
-                                    <th class="py-3 px-4 font-bold text-center">📝 Draft</th>
-                                    <th class="py-3 px-4 font-bold text-center">⏳ Pending</th>
-                                    <th class="py-3 px-4 font-bold text-center">✅ Approved</th>
-                                    <th class="py-3 px-4 font-bold text-center">📦 Received</th>
-                                    <th class="py-3 px-4 font-bold text-right">Total Anggaran</th>
-                                </tr>
-                            </thead>
-                            <tbody id="storeSummaryTable" class="divide-y divide-slate-100">
-                                <!-- Dynamic JS Injection -->
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </section>
-
-            <!-- ========================================== -->
-            <!-- TAB 2: DETAILED REQUEST LIST               -->
-            <!-- ========================================== -->
-            <section id="tab-requests" class="hidden space-y-6">
-                <!-- Filters & Search Panel -->
-                <div class="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">
-                    <div class="flex flex-col lg:flex-row justify-between lg:items-center gap-4">
-                        <div class="relative flex-1">
-                            <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400">
-                                <i class="fa-solid fa-magnifying-glass"></i>
-                            </span>
-                            <input type="text" id="reqSearchInput" oninput="applyFilters()" placeholder="Cari nama barang, cabang, atau pemohon..." class="w-full bg-slate-50 pl-10 pr-4 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 transition-all">
-                        </div>
-                        
-                        <div class="grid grid-cols-2 md:grid-cols-4 gap-2">
-                            <select id="filterCabang" onchange="applyFilters()" class="bg-slate-50 border border-slate-200 rounded-xl text-xs p-2.5 focus:outline-none focus:ring-1 focus:ring-primary-500">
-                                <option value="ALL">Semua Cabang</option>
-                            </select>
-
-                            <select id="filterStatus" onchange="applyFilters()" class="bg-slate-50 border border-slate-200 rounded-xl text-xs p-2.5 focus:outline-none focus:ring-1 focus:ring-primary-500">
-                                <option value="ALL">Semua Status</option>
-                                <option value="📝 Draft">📝 Draft</option>
-                                <option value="⏳ Pending Approval">⏳ Pending Approval</option>
-                                <option value="✅ Approved">✅ Approved</option>
-                                <option value="❌ Rejected">❌ Rejected</option>
-                                <option value="🛒 Purchased">🛒 Purchased</option>
-                                <option value="📦 Received">📦 Received</option>
-                            </select>
-
-                            <select id="filterKategori" onchange="applyFilters()" class="bg-slate-50 border border-slate-200 rounded-xl text-xs p-2.5 focus:outline-none focus:ring-1 focus:ring-primary-500">
-                                <option value="ALL">Semua Kategori</option>
-                                <option value="ATK">ATK</option>
-                                <option value="Chemical">Chemical</option>
-                                <option value="Facilities Building">Facilities Building</option>
-                                <option value="Facilities Dine In">Facilities Dine In</option>
-                                <option value="Support Equipment">Support Equipment</option>
-                                <option value="Lainnya">Lainnya</option>
-                            </select>
-
-                            <button onclick="resetFilters()" class="bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold p-2.5 transition-all">
-                                <i class="fa-solid fa-arrow-rotate-left mr-1"></i> Reset Filter
-                            </button>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Requests Table Container -->
-                <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-                    <div class="overflow-x-auto custom-scrollbar">
-                        <table class="w-full text-left text-xs border-collapse">
-                            <thead>
-                                <tr class="bg-slate-50 text-slate-500 uppercase tracking-wider border-b border-slate-200 font-bold">
-                                    <th class="py-3 px-4">Tgl Pengajuan</th>
-                                    <th class="py-3 px-4">Cabang</th>
-                                    <th class="py-3 px-4">Pemohon / Divisi</th>
-                                    <th class="py-3 px-4">Barang & Qty</th>
-                                    <th class="py-3 px-4">Urgensi & Lampiran</th>
-                                    <th class="py-3 px-4">Estimasi Harga</th>
-                                    <th class="py-3 px-4 text-center">Status</th>
-                                    <th class="py-3 px-4 text-center">Aksi / Tindakan</th>
-                                </tr>
-                            </thead>
-                            <tbody id="requestsTableBody" class="divide-y divide-slate-100">
-                                <!-- Rows will be rendered dynamically -->
-                            </tbody>
-                        </table>
-                    </div>
-
-                    <!-- Pagination Controls -->
-                    <div class="p-4 border-t border-slate-100 flex flex-col sm:flex-row justify-between items-center gap-4">
-                        <span class="text-xs text-slate-500 font-medium" id="paginationInfo">Menampilkan 0 dari 0 data</span>
-                        <div class="flex items-center space-x-1" id="paginationControls">
-                            <!-- Buttons injected dynamically -->
-                        </div>
-                    </div>
-                </div>
-            </section>
-
-            <!-- ========================================== -->
-            <!-- TAB 3: CREATE NEW REQUEST FORM             -->
-            <!-- ========================================== -->
-            <section id="tab-new-request" class="hidden">
-                <div class="max-w-3xl mx-auto bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-                    <div class="p-6 bg-gradient-to-r from-primary-700 to-primary-900 text-white">
-                        <h3 class="text-lg font-bold">Formulir Pengajuan Barang / Logistik</h3>
-                        <p class="text-xs text-primary-100 mt-1">Pastikan informasi diisi secara akurat agar mempercepat proses persetujuan eksekutif.</p>
-                    </div>
-
-                    <form id="requestForm" onsubmit="handleFormSubmit(event)" class="p-6 space-y-5">
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div>
-                                <label class="block text-xs font-bold text-slate-600 mb-1.5 uppercase">Cabang Toko / Store *</label>
-                                <select id="formCabang" required class="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500">
-                                    <option value="" disabled selected>Pilih Cabang...</option>
-                                    <option value="BAKSO TENTREM">BAKSO TENTREM</option>
-                                    <option value="BINTARO">BINTARO</option>
-                                    <option value="BEKASI">BEKASI</option>
-                                    <option value="CIPETE">CIPETE</option>
-                                    <option value="MASKUMAMBANG">MASKUMAMBANG</option>
-                                    <option value="MRT">MRT</option>
-                                    <option value="OFFICE">OFFICE</option>
-                                    <option value="PASARAYA">PASARAYA</option>
-                                    <option value="SBY BARAT">SBY BARAT</option>
-                                    <option value="SBY MUSI">SBY MUSI</option>
-                                </select>
-                            </div>
-
-                            <div>
-                                <label class="block text-xs font-bold text-slate-600 mb-1.5 uppercase">Pemohon / PIC *</label>
-                                <input type="text" id="formPemohon" required placeholder="Contoh: Sammy / Ihsan" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500">
-                            </div>
-                        </div>
-
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div>
-                                <label class="block text-xs font-bold text-slate-600 mb-1.5 uppercase">Untuk Divisi *</label>
-                                <select id="formDivisi" required class="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500">
-                                    <option value="" disabled selected>Pilih Divisi...</option>
-                                    <option value="Kitchen">Kitchen</option>
-                                    <option value="Produksi">Produksi</option>
-                                    <option value="Topping Sweet">Topping Sweet</option>
-                                    <option value="Lainnya">Lainnya</option>
-                                </select>
-                            </div>
-
-                            <div>
-                                <label class="block text-xs font-bold text-slate-600 mb-1.5 uppercase">Kategori Barang *</label>
-                                <select id="formKategori" required class="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500">
-                                    <option value="" disabled selected>Pilih Kategori...</option>
-                                    <option value="ATK">ATK</option>
-                                    <option value="Chemical">Chemical</option>
-                                    <option value="Facilities Building">Facilities Building</option>
-                                    <option value="Facilities Dine In">Facilities Dine In</option>
-                                    <option value="Support Equipment">Support Equipment</option>
-                                    <option value="Lainnya">Lainnya</option>
-                                </select>
-                            </div>
-                        </div>
-
-                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <div class="md:col-span-2">
-                                <label class="block text-xs font-bold text-slate-600 mb-1.5 uppercase">Nama Barang / Deskripsi *</label>
-                                <input type="text" id="formNamaBarang" required placeholder="Contoh: Sapu Kuali / Loyang Donat" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500">
-                            </div>
-
-                            <div>
-                                <label class="block text-xs font-bold text-slate-600 mb-1.5 uppercase">Jumlah (Qty) *</label>
-                                <input type="number" id="formQty" required min="1" placeholder="1" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500">
-                            </div>
-                        </div>
-
-                        <div>
-                            <label class="block text-xs font-bold text-slate-600 mb-1.5 uppercase">Alasan Kebutuhan / Urgensi *</label>
-                            <textarea id="formAlasan" required rows="3" placeholder="Jelaskan kondisi barang saat ini dan mengapa butuh diganti segera..." class="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"></textarea>
-                        </div>
-
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div>
-                                <label class="block text-xs font-bold text-slate-600 mb-1.5 uppercase">Estimasi Harga Satuan (Rp) *</label>
-                                <input type="number" id="formHarga" required placeholder="Contoh: 150000" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500">
-                            </div>
-
-                            <div>
-                                <label class="block text-xs font-bold text-slate-600 mb-1.5 uppercase">Link Foto / Bukti (Google Drive Link)</label>
-                                <input type="url" id="formMedia" placeholder="https://drive.google.com/..." class="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500">
-                            </div>
-                        </div>
-
-                        <div class="border-t border-slate-100 pt-4 flex justify-end space-x-3">
-                            <button type="button" onclick="resetForm()" class="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold px-5 py-2.5 rounded-xl text-sm transition-all">Batal</button>
-                            <button type="submit" class="bg-primary-600 hover:bg-primary-700 text-white font-bold px-6 py-2.5 rounded-xl text-sm transition-all shadow-md">Simpan Pengajuan</button>
-                        </div>
-                    </form>
-                </div>
-            </section>
-
-            <!-- ========================================== -->
-            <!-- TAB 4: SPREADSHEET DATABASE SETTINGS      -->
-            <!-- ========================================== -->
-            <section id="tab-settings" class="hidden">
-                <div class="max-w-3xl mx-auto bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-                    <div class="p-6 bg-emerald-700 text-white flex items-center space-x-3">
-                        <i class="fa-solid fa-database text-2xl"></i>
-                        <div>
-                            <h3 class="text-lg font-bold">Koneksi Database Google Sheets</h3>
-                            <p class="text-xs text-emerald-100 mt-1">Hubungkan file HTML ini ke Google Spreadsheet Anda secara langsung</p>
-                        </div>
-                    </div>
-
-                    <div class="p-6 space-y-6">
-                        <div class="space-y-2">
-                            <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider">Langkah Setup Google Sheets Anda:</label>
-                            <ol class="list-decimal list-inside text-xs text-slate-600 space-y-2 bg-slate-50 p-4 rounded-xl border border-slate-150 leading-relaxed">
-                                <li>Buka file Google Sheets Anda.</li>
-                                <li>Klik menu <strong class="text-slate-900">File</strong> &gt; <strong class="text-slate-900">Share (Bagikan)</strong> &gt; <strong class="text-slate-900">Publish to Web (Publikasikan ke Web)</strong>.</li>
-                                <li>Pilih opsi <strong class="text-slate-900">Link</strong>, ubah "Seluruh Dokumen" menjadi sheet database Anda (contoh: <strong class="text-slate-900">Database_Request Items 2026</strong>).</li>
-                                <li>Ubah format output dari "Halaman Web" menjadi <strong class="text-emerald-700 font-bold">Comma-separated values (.csv)</strong>.</li>
-                                <li>Klik tombol <strong class="text-primary-600">Publish</strong>, lalu salin (copy) tautan URL yang diberikan.</li>
-                                <li>Tempelkan (paste) tautan tersebut pada kolom input di bawah ini!</li>
-                            </ol>
-                        </div>
-
-                        <div class="border-t border-slate-100 pt-5 space-y-4">
-                            <div>
-                                <label class="block text-xs font-bold text-slate-700 mb-1.5 uppercase">URL Google Sheets CSV Anda *</label>
-                                <input type="url" id="sheetsCsvUrl" placeholder="https://docs.google.com/spreadsheets/d/e/.../pub?output=csv" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 transition-all font-mono">
-                            </div>
-
-                            <div class="flex items-center space-x-3">
-                                <button onclick="saveSettings()" class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-6 py-2.5 rounded-xl text-xs sm:text-sm transition-all shadow-md">
-                                    Simpan & Hubungkan Database
-                                </button>
-                                <button onclick="clearSettings()" class="text-red-600 hover:text-red-700 font-semibold text-xs sm:text-sm px-4 py-2 rounded-xl transition-all">
-                                    Hapus Koneksi
-                                </button>
-                            </div>
-                        </div>
-
-                        <!-- Hosting Guide -->
-                        <div class="border-t border-slate-200 pt-6">
-                            <h4 class="font-bold text-slate-900 text-sm mb-2"><i class="fa-solid fa-cloud-arrow-up mr-1 text-primary-500"></i> Cara Membuka di Semua Device (Hosting Gratis)</h4>
-                            <p class="text-xs text-slate-600 leading-relaxed mb-3">
-                                Agar website dashboard ini bisa diakses dari smartphone, tablet, atau laptop manapun secara real-time, Anda bisa menyebarkannya dengan metode gratis:
-                            </p>
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                <div class="bg-slate-50 p-3 rounded-xl border border-slate-200 text-xs">
-                                    <h5 class="font-bold text-slate-800 mb-1">Opsi A: Netlify Drop (Sangat Mudah!)</h5>
-                                    <ol class="list-decimal list-inside text-slate-600 space-y-1">
-                                        <li>Buka website <a href="https://app.netlify.com/drop" target="_blank" class="text-primary-600 underline font-medium">Netlify Drop</a>.</li>
-                                        <li>Drag-and-drop file <code class="bg-slate-200 px-1 rounded">index.html</code> ini ke dalam kotak.</li>
-                                        <li>Dalam 5 detik, Anda dapet link website langsung aktif gratis!</li>
-                                    </ol>
-                                </div>
-                                <div class="bg-slate-50 p-3 rounded-xl border border-slate-200 text-xs">
-                                    <h5 class="font-bold text-slate-800 mb-1">Opsi B: Vercel / GitHub Pages</h5>
-                                    <p class="text-slate-600">Cocok bagi yang ingin menyinkronkan langsung dengan kode di repository GitHub agar ter-update otomatis jika ada perubahan.</p>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </section>
-
-        </main>
-    </div>
-
-    <!-- SCRIPT LOGIKA UTAMA APLIKASI -->
-    <script>
-        // Data Mockup / Default jika Google Sheets belum dikonfigurasi
-        const demoData = [
-            { id: 1, tglRequest: "21/05/2026", tglBeli: "20/05/2026", cabang: "BAKSO TENTREM", pemohon: "Ihsan", divisi: "Lainnya", kategori: "Facilities Dine In", namaBarang: "Taplak Meja Hijau", qty: 2, alasan: "Robek", media: "https://drive.google.com/file/d/1gLVWCVzcWwdMsKf1BVYl57LNhMbqX0BD", status: "📦 Received", harga: 112598, directWa: "https://wa.me/..." },
-            { id: 2, tglRequest: "21/05/2026", tglBeli: "20/05/2026", cabang: "BAKSO TENTREM", pemohon: "Ihsan", divisi: "Lainnya", kategori: "Facilities Dine In", namaBarang: "Taplak Meja Bening", qty: 2, alasan: "Robek", media: "https://drive.google.com/file/d/1gLVWCVzcWwdMsKf1BVYl57LNhMbqX0BD", status: "📦 Received", harga: 0, directWa: "https://wa.me/..." },
-            { id: 3, tglRequest: "20/06/2026", tglBeli: "", cabang: "BAKSO TENTREM", pemohon: "Ihsan", divisi: "Kitchen", kategori: "ATK", namaBarang: "Sapu Kuali", qty: 1, alasan: "Sudah Rusak & Rontok", media: "", status: "⏳ Pending Approval", harga: 45000, directWa: "https://wa.me/..." },
-            { id: 4, tglRequest: "03/07/2026", tglBeli: "", cabang: "BEKASI", pemohon: "Nadimas", divisi: "Lainnya", kategori: "Support Equipment", namaBarang: "Dudukan Toilet", qty: 1, alasan: "Rusak", media: "https://drive.google.com/file/d/1gLVWCVzcWwdMsKf1BVYl57LNhMbqX0BD", status: "📝 Draft", harga: 175000, directWa: "https://wa.me/..." },
-            { id: 5, tglRequest: "02/07/2026", tglBeli: "", cabang: "SBY MUSI", pemohon: "Sammy", divisi: "Topping Sweet", kategori: "Support Equipment", namaBarang: "Timbangan Kecil", qty: 1, alasan: "Sudah error ga bisa akurat", media: "", status: "📝 Draft", harga: 120000, directWa: "https://wa.me/..." },
-            { id: 6, tglRequest: "02/07/2026", tglBeli: "", cabang: "SBY MUSI", pemohon: "Sammy", divisi: "Produksi", kategori: "Support Equipment", namaBarang: "Loyang Donat 60x40", qty: 12, alasan: "Kondisi saat ini sobek dan sering nyangkut di trolly", media: "", status: "📝 Draft", harga: 650000, directWa: "https://wa.me/..." },
-            { id: 7, tglRequest: "01/07/2026", tglBeli: "02/07/2026", cabang: "BINTARO", pemohon: "Byan", divisi: "Kitchen", kategori: "Chemical", namaBarang: "Deterjen Cair", qty: 4, alasan: "Habis", media: "", status: "✅ Approved", harga: 220000, directWa: "https://wa.me/..." },
-            { id: 8, tglRequest: "29/06/2026", tglBeli: "", cabang: "MASKUMAMBANG", pemohon: "Chandra", divisi: "Kitchen", kategori: "Facilities Building", namaBarang: "Gagang Pintu Kamar Mandi", qty: 1, alasan: "Patah", media: "", status: "❌ Rejected", harga: 145000, directWa: "https://wa.me/..." },
-            { id: 9, tglRequest: "30/06/2026", tglBeli: "", cabang: "MRT", pemohon: "Adhlan", divisi: "Lainnya", kategori: "Facilities Building", namaBarang: "Kran Air Wastafel", qty: 2, alasan: "Bocor parah", media: "", status: "🛒 Purchased", harga: 110000, directWa: "https://wa.me/..." }
-        ];
-
-        let database = [];
-        let filteredDatabase = [];
-        let currentRole = "Executive"; // Default Role
-        let currentPage = 1;
-        const itemsPerPage = 6;
-        let categoryChartInstance = null;
-        let statusChartInstance = null;
-
-        // On Load initialization
-        window.onload = function() {
-            initApp();
-        };
-
-        function initApp() {
-            // Load custom settings
-            const savedUrl = localStorage.getItem("sheetsCsvUrl");
-            if (savedUrl) {
-                document.getElementById("sheetsCsvUrl").value = savedUrl;
-                fetchDataFromSheets(savedUrl);
-            } else {
-                // Gunakan demoData jika spreadsheet belum dikonfigurasi
-                database = [...demoData];
-                filteredDatabase = [...database];
-                showBadge("local");
-                updateAppUI();
-            }
-            populateFilterOptions();
-        }
-
-        // Tampilkan badge status koneksi
-        function showBadge(type) {
-            if (type === "online") {
-                document.getElementById("connectionBadge").classList.remove("hidden");
-                document.getElementById("localBadge").classList.add("hidden");
-                document.getElementById("syncStatusText").innerHTML = "Data Terkoneksi Google Sheets";
-            } else {
-                document.getElementById("connectionBadge").classList.add("hidden");
-                document.getElementById("localBadge").classList.remove("hidden");
-                document.getElementById("syncStatusText").innerHTML = "Menggunakan Demo Data";
-            }
-        }
-
-        // Sync Data Real-time dari Google Sheets
-        function syncData() {
-            const url = localStorage.getItem("sheetsCsvUrl");
-            const spinner = document.getElementById("syncSpinner");
-            spinner.classList.add("animate-spin");
-
-            setTimeout(() => {
-                if (url) {
-                    fetchDataFromSheets(url);
-                } else {
-                    database = [...demoData];
-                    filteredDatabase = [...database];
-                    updateAppUI();
-                    showNotification("success", "Demo Sinkronisasi Sukses", "Sistem berhasil memperbarui data simulasi lokal.");
-                }
-                spinner.classList.remove("animate-spin");
-            }, 800);
-        }
-
-        // Fetch Google Sheets Data
-        function fetchDataFromSheets(url) {
-            Papa.parse(url, {
-                download: true,
-                header: true,
-                skipEmptyLines: true,
-                complete: function(results) {
-                    const parsedData = results.data;
-                    if (parsedData.length > 0) {
-                        // Transformasi data header CSV agar sesuai dengan variabel internal
-                        database = parsedData.map((row, idx) => {
-                            const parseMoney = (val) => {
-                                if (!val) return 0;
-                                return Number(val.replace(/[^0-9,-]/g, '').replace(',', '.'));
-                            };
-
-                            return {
-                                id: idx + 1,
-                                tglRequest: row["Tgl Request"] || row["Tgl_Request"] || "",
-                                tglBeli: row["Tgl Terakhir Pembelian"] || row["Tgl_Terakhir_Pembelian"] || "",
-                                cabang: row["Cabang"] || "OFFICE",
-                                pemohon: row["Pemohon /PIC"] || row["Pemohon"] || "Staff",
-                                divisi: row["Untuk Divisi"] || row["Untuk_Divisi"] || "Umum",
-                                kategori: row["Kategori"] || "Lainnya",
-                                namaBarang: row["Nama Barang"] || row["Nama_Barang"] || "Tanpa Nama",
-                                qty: parseInt(row["Qty"]) || 1,
-                                alasan: row["Alasan Urgensi"] || row["Alasan_Urgensi"] || "",
-                                media: row["Media"] || row["Bukti Pembayaran"] || "",
-                                status: row["Status"] || "📝 Draft",
-                                harga: parseMoney(row["Harga"] || "0"),
-                                directWa: row["Direct Whatapps"] || ""
-                            };
-                        });
-                        filteredDatabase = [...database];
-                        showBadge("online");
-                        updateAppUI();
-                        populateFilterOptions();
-                        showNotification("success", "Sinkronisasi Berhasil", "Database terbaru berhasil ditarik langsung dari Google Sheets.");
-                    } else {
-                        showNotification("error", "Data Kosong", "Gagal memproses baris database Google Sheets.");
-                    }
-                },
-                error: function(err) {
-                    showNotification("error", "Koneksi Gagal", "Pastikan URL Google Sheets Anda dipublikasikan dengan benar sebagai format CSV.");
-                }
-            });
-        }
-
-        // Menyimpan setting URL ke LocalStorage
-        function saveSettings() {
-            const url = document.getElementById("sheetsCsvUrl").value.trim();
-            if (url) {
-                localStorage.setItem("sheetsCsvUrl", url);
-                fetchDataFromSheets(url);
-            } else {
-                showNotification("error", "URL Salah", "Masukkan URL publikasi Google Sheets CSV yang valid.");
-            }
-        }
-
-        // Menghapus database eksternal dan kembali ke demo data
-        function clearSettings() {
-            localStorage.removeItem("sheetsCsvUrl");
-            document.getElementById("sheetsCsvUrl").value = "";
-            database = [...demoData];
-            filteredDatabase = [...database];
-            showBadge("local");
-            updateAppUI();
-            showNotification("success", "Sistem Diatur Ulang", "Aplikasi kembali menggunakan basis data demo.");
-        }
-
-        // Multi-role switching
-        function switchRole(role) {
-            currentRole = role;
-            updateAppUI();
-            showNotification("info", `Mode Akses Diubah`, `Sekarang Anda menjelajah sebagai ${role}.`);
-        }
-
-        // Tab Switcher
-        function switchTab(tabId) {
-            const tabs = ['dashboard', 'requests', 'new-request', 'settings'];
-            tabs.forEach(tab => {
-                document.getElementById(`tab-${tab}`).classList.add('hidden');
-                document.getElementById(`btn-tab-${tab}`).className = "w-full flex items-center space-x-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all text-slate-600 hover:bg-slate-50 hover:text-slate-900";
-            });
-
-            document.getElementById(`tab-${tabId}`).classList.remove('hidden');
-            document.getElementById(`btn-tab-${tabId}`).className = "w-full flex items-center space-x-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all bg-primary-50 text-primary-600";
-            
-            if (tabId === 'dashboard') {
-                renderCharts();
-            }
-        }
-
-        // Populate dynamic lists for filter criteria
-        function populateFilterOptions() {
-            const cabangSet = new Set();
-            database.forEach(item => {
-                if (item.cabang) cabangSet.add(item.cabang.trim());
-            });
-
-            const filterCabang = document.getElementById("filterCabang");
-            // Clear but keep first
-            filterCabang.innerHTML = `<option value="ALL">Semua Cabang</option>`;
-            cabangSet.forEach(cabang => {
-                filterCabang.innerHTML += `<option value="${cabang}">${cabang}</option>`;
-            });
-        }
-
-        // Filters applied from controls
-        function applyFilters() {
-            const searchVal = document.getElementById("reqSearchInput").value.toLowerCase();
-            const cabangVal = document.getElementById("filterCabang").value;
-            const statusVal = document.getElementById("filterStatus").value;
-            const kategoriVal = document.getElementById("filterKategori").value;
-
-            filteredDatabase = database.filter(item => {
-                const matchSearch = item.namaBarang.toLowerCase().includes(searchVal) || 
-                                    item.cabang.toLowerCase().includes(searchVal) || 
-                                    item.pemohon.toLowerCase().includes(searchVal);
-                const matchCabang = (cabangVal === "ALL" || item.cabang === cabangVal);
-                const matchStatus = (statusVal === "ALL" || item.status === statusVal);
-                const matchKategori = (kategoriVal === "ALL" || item.kategori === kategoriVal);
-
-                return matchSearch && matchCabang && matchStatus && matchKategori;
-            });
-
-            currentPage = 1;
-            renderRequestTable();
-        }
-
-        function resetFilters() {
-            document.getElementById("reqSearchInput").value = "";
-            document.getElementById("filterCabang").value = "ALL";
-            document.getElementById("filterStatus").value = "ALL";
-            document.getElementById("filterKategori").value = "ALL";
-            filteredDatabase = [...database];
-            currentPage = 1;
-            renderRequestTable();
-        }
-
-        // Update UI components
-        function updateAppUI() {
-            renderDashboard();
-            renderRequestTable();
-            renderCharts();
-        }
-
-        // Render Dashboard KPIs
-        function renderDashboard() {
-            const bulanFilter = document.getElementById("filterBulanDashboard").value;
-            
-            const targetData = database.filter(item => {
-                if (bulanFilter === "ALL") return true;
-                if (!item.tglRequest) return false;
-                const monthParts = item.tglRequest.split("/");
-                return monthParts[1] === bulanFilter;
-            });
-
-            const totalReq = targetData.length;
-            const approvedCost = targetData
-                .filter(item => item.status === "📦 Received" || item.status === "✅ Approved" || item.status === "🛒 Purchased")
-                .reduce((acc, curr) => acc + (curr.harga * curr.qty), 0);
-            
-            const pendingAndDraft = targetData.filter(item => item.status === "⏳ Pending Approval" || item.status === "📝 Draft").length;
-            const receivedCount = targetData.filter(item => item.status === "📦 Received").length;
-
-            document.getElementById("stat-total-request").innerText = totalReq;
-            document.getElementById("stat-total-cost").innerText = formatRupiah(approvedCost);
-            document.getElementById("stat-pending-approval").innerText = pendingAndDraft;
-            document.getElementById("stat-received").innerText = receivedCount;
-
-            // Generate Store Summary Table
-            const storeStats = {};
-            targetData.forEach(item => {
-                if (!storeStats[item.cabang]) {
-                    storeStats[item.cabang] = { total: 0, draft: 0, pending: 0, approved: 0, received: 0, cost: 0 };
-                }
-                const s = storeStats[item.cabang];
-                s.total++;
-                if (item.status === "📝 Draft") s.draft++;
-                else if (item.status === "⏳ Pending Approval") s.pending++;
-                else if (item.status === "✅ Approved" || item.status === "🛒 Purchased") s.approved++;
-                else if (item.status === "📦 Received") s.received++;
-
-                if (item.status === "📦 Received" || item.status === "✅ Approved" || item.status === "🛒 Purchased") {
-                    s.cost += (item.harga * item.qty);
-                }
-            });
-
-            const storeSummaryTable = document.getElementById("storeSummaryTable");
-            storeSummaryTable.innerHTML = "";
-
-            if (Object.keys(storeStats).length === 0) {
-                storeSummaryTable.innerHTML = `<tr><td colspan="7" class="text-center py-8 text-slate-400">Tidak ada data untuk periode ini</td></tr>`;
-                return;
-            }
-
-            for (const store in storeStats) {
-                const s = storeStats[store];
-                storeSummaryTable.innerHTML += `
-                    <tr class="hover:bg-slate-50 transition-colors">
-                        <td class="py-3.5 px-4 font-bold text-slate-950">${store}</td>
-                        <td class="py-3.5 px-4 text-center font-semibold text-slate-700">${s.total}</td>
-                        <td class="py-3.5 px-4 text-center"><span class="bg-slate-100 text-slate-700 px-2 py-0.5 rounded text-xxs font-medium">${s.draft}</span></td>
-                        <td class="py-3.5 px-4 text-center"><span class="bg-amber-100 text-amber-700 px-2 py-0.5 rounded text-xxs font-medium">${s.pending}</span></td>
-                        <td class="py-3.5 px-4 text-center"><span class="bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded text-xxs font-medium">${s.approved}</span></td>
-                        <td class="py-3.5 px-4 text-center"><span class="bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded text-xxs font-medium">${s.received}</span></td>
-                        <td class="py-3.5 px-4 text-right font-bold text-slate-800">${formatRupiah(s.cost)}</td>
+                      </td>
                     </tr>
-                `;
-            }
-        }
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </main>
 
-        // Render Request Table in Tab 2
-        function renderRequestTable() {
-            const startIdx = (currentPage - 1) * itemsPerPage;
-            const pageData = filteredDatabase.slice(startIdx, startIdx + itemsPerPage);
-            const tbody = document.getElementById("requestsTableBody");
+      {/* --- FOOTER --- */}
+      <footer className="bg-white border-t border-slate-200 mt-20 py-8 dark:bg-slate-800 dark:border-slate-700">
+        <div className="max-w-7xl mx-auto px-4 text-center text-xs text-slate-500 dark:text-slate-400">
+          <p>© 2026 Sistem Permintaan Barang Internal (ReqBarang). Didukung oleh Database Cloud Firebase.</p>
+          <div className="flex justify-center gap-4 mt-2">
+            <span>Server: Global Cloud</span>
+            <span>•</span>
+            <span>Real-time Sync: Aktif</span>
+            <span>•</span>
+            <span>Keamanan: Terenkripsi</span>
+          </div>
+        </div>
+      </footer>
+
+      {/* ========================================================================= */}
+      {/* --- MODAL FORM PERMINTAAN BARU --- */}
+      {/* ========================================================================= */}
+      {isModalOpen && (
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-black bg-opacity-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-2xl w-full p-6 shadow-2xl relative dark:bg-slate-800 dark:text-white">
+            <h3 className="text-xl font-bold mb-4 border-b pb-2 text-indigo-600 dark:text-indigo-400">Buat Permintaan Barang</h3>
             
-            tbody.innerHTML = "";
+            <form onSubmit={handleSubmitRequest} className="space-y-4">
+              
+              {/* Form Baris 1: Info Pemohon */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Nama Pemohon (PIC)</label>
+                  <input 
+                    type="text" 
+                    name="pemohon" 
+                    required
+                    value={formData.pemohon} 
+                    onChange={handleInputChange}
+                    className="w-full border rounded-lg p-2.5 bg-slate-50 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none dark:bg-slate-700 dark:border-slate-600"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">WhatsApp (Format: 628...)</label>
+                  <input 
+                    type="text" 
+                    name="whatsapp" 
+                    required
+                    placeholder="Contoh: 62812345678"
+                    value={formData.whatsapp} 
+                    onChange={handleInputChange}
+                    className="w-full border rounded-lg p-2.5 bg-slate-50 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none dark:bg-slate-700 dark:border-slate-600"
+                  />
+                </div>
+              </div>
 
-            if (pageData.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="8" class="text-center py-10 text-slate-400 font-medium">Data pengajuan tidak ditemukan.</td></tr>`;
-                updatePagination(0);
-                return;
-            }
+              {/* Form Baris 2: Cabang & Divisi */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Cabang</label>
+                  <input 
+                    type="text" 
+                    name="cabang" 
+                    required
+                    value={formData.cabang} 
+                    onChange={handleInputChange}
+                    className="w-full border rounded-lg p-2.5 bg-slate-50 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none dark:bg-slate-700 dark:border-slate-600"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Untuk Divisi</label>
+                  <input 
+                    type="text" 
+                    name="divisi" 
+                    required
+                    value={formData.divisi} 
+                    onChange={handleInputChange}
+                    className="w-full border rounded-lg p-2.5 bg-slate-50 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none dark:bg-slate-700 dark:border-slate-600"
+                  />
+                </div>
+              </div>
 
-            pageData.forEach(item => {
-                const totalCost = item.harga * item.qty;
-                const statusBadge = getStatusBadge(item.status);
-                const buttonActions = getActionButtons(item);
+              {/* Form Baris 3: Detil Barang */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Nama Barang</label>
+                  <input 
+                    type="text" 
+                    name="namaBarang" 
+                    required
+                    placeholder="Contoh: Keyboard Logi K120"
+                    value={formData.namaBarang} 
+                    onChange={handleInputChange}
+                    className="w-full border rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none dark:bg-slate-700 dark:border-slate-600"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Kategori</label>
+                  <select 
+                    name="kategori" 
+                    value={formData.kategori} 
+                    onChange={handleInputChange}
+                    className="w-full border rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none dark:bg-slate-700 dark:border-slate-600"
+                  >
+                    <option value="IT/Elektronik">IT/Elektronik</option>
+                    <option value="Alat Tulis Kantor">Alat Tulis Kantor</option>
+                    <option value="Operasional Kantor">Operasional Kantor</option>
+                    <option value="Peralatan Dapur/Kebersihan">Peralatan Dapur/Kebersihan</option>
+                    <option value="Lain-lain">Lain-lain</option>
+                  </select>
+                </div>
+              </div>
 
-                const hasAttachment = item.media ? `
-                    <a href="${item.media}" target="_blank" class="inline-flex items-center space-x-1 text-primary-600 hover:text-primary-700 font-bold transition-colors">
-                        <i class="fa-solid fa-paperclip"></i> <span>Lampiran</span>
-                    </a>
-                ` : `<span class="text-slate-400 italic">No File</span>`;
+              {/* Form Baris 4: Qty, Tgl Terakhir, Urgensi */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Jumlah (Qty)</label>
+                  <input 
+                    type="number" 
+                    name="qty" 
+                    required
+                    min="1"
+                    value={formData.qty} 
+                    onChange={handleInputChange}
+                    className="w-full border rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none dark:bg-slate-700 dark:border-slate-600"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Tgl Terakhir Beli</label>
+                  <input 
+                    type="date" 
+                    name="tglTerakhirPembelian" 
+                    value={formData.tglTerakhirPembelian} 
+                    onChange={handleInputChange}
+                    className="w-full border rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none dark:bg-slate-700 dark:border-slate-600"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Alasan Urgensi</label>
+                  <select 
+                    name="alasanUrgensi" 
+                    value={formData.alasanUrgensi} 
+                    onChange={handleInputChange}
+                    className="w-full border rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none dark:bg-slate-700 dark:border-slate-600"
+                  >
+                    <option value="Normal">Normal</option>
+                    <option value="Tinggi">Tinggi / Urgent</option>
+                    <option value="Sangat Mendesak">Sangat Mendesak (Mengganggu Operasional)</option>
+                  </select>
+                </div>
+              </div>
 
-                tbody.innerHTML += `
-                    <tr class="hover:bg-slate-50 transition-colors">
-                        <td class="py-4 px-4 font-medium text-slate-600">${item.tglRequest || '-'}</td>
-                        <td class="py-4 px-4"><span class="font-bold text-slate-900">${item.cabang}</span></td>
-                        <td class="py-4 px-4">
-                            <div class="font-bold text-slate-800">${item.pemohon}</div>
-                            <div class="text-xxs text-slate-400">${item.divisi}</div>
-                        </td>
-                        <td class="py-4 px-4">
-                            <div class="font-semibold text-slate-900">${item.namaBarang}</div>
-                            <div class="text-xxs text-primary-600 font-bold bg-primary-50 inline-block px-1.5 py-0.5 rounded mt-0.5">${item.kategori}</div>
-                            <div class="text-slate-500 font-bold mt-1">Qty: ${item.qty}</div>
-                        </td>
-                        <td class="py-4 px-4 space-y-1 max-w-[200px]">
-                            <p class="text-xxs text-slate-500 line-clamp-2" title="${item.alasan}">${item.alasan || '-'}</p>
-                            <div>${hasAttachment}</div>
-                        </td>
-                        <td class="py-4 px-4">
-                            <div class="font-bold text-slate-900">${formatRupiah(item.harga)}</div>
-                            <div class="text-xxs text-slate-400">Total: ${formatRupiah(totalCost)}</div>
-                        </td>
-                        <td class="py-4 px-4 text-center">${statusBadge}</td>
-                        <td class="py-4 px-4 text-center">
-                            <div class="flex items-center justify-center space-x-1.5 flex-wrap gap-y-1">
-                                ${buttonActions}
-                            </div>
-                        </td>
-                    </tr>
-                `;
-            });
+              {/* Form Baris 5: Media & Harga Estimasi */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Media Rekomendasi</label>
+                  <input 
+                    type="text" 
+                    name="media" 
+                    placeholder="Contoh: Tokopedia, Toko Offline Makmur, Shopee"
+                    value={formData.media} 
+                    onChange={handleInputChange}
+                    className="w-full border rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none dark:bg-slate-700 dark:border-slate-600"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Estimasi Harga Satuan (Rp)</label>
+                  <input 
+                    type="number" 
+                    name="harga" 
+                    value={formData.harga} 
+                    onChange={handleInputChange}
+                    className="w-full border rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none dark:bg-slate-700 dark:border-slate-600"
+                  />
+                </div>
+              </div>
 
-            updatePagination(filteredDatabase.length);
-        }
+              {/* Form Baris 6: Notes */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Catatan Tambahan / Alasan Pengajuan</label>
+                <textarea 
+                  name="notes" 
+                  rows="3"
+                  placeholder="Jelaskan secara singkat detail spesifikasi barang atau alasan mendesak lainnya..."
+                  value={formData.notes} 
+                  onChange={handleInputChange}
+                  className="w-full border rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none dark:bg-slate-700 dark:border-slate-600"
+                ></textarea>
+              </div>
 
-        // Helper Status Badges styling
-        function getStatusBadge(status) {
-            const normalStatus = status ? status.trim() : "";
-            switch(normalStatus) {
-                case "📝 Draft":
-                    return `<span class="bg-slate-100 text-slate-800 px-2.5 py-1 rounded-full font-bold text-xxs tracking-wider border border-slate-200">DRAFT</span>`;
-                case "⏳ Pending Approval":
-                    return `<span class="bg-amber-50 text-amber-700 px-2.5 py-1 rounded-full font-bold text-xxs tracking-wider border border-amber-200">PENDING</span>`;
-                case "✅ Approved":
-                    return `<span class="bg-emerald-50 text-emerald-700 px-2.5 py-1 rounded-full font-bold text-xxs tracking-wider border border-emerald-200">APPROVED</span>`;
-                case "❌ Rejected":
-                    return `<span class="bg-rose-50 text-rose-700 px-2.5 py-1 rounded-full font-bold text-xxs tracking-wider border border-rose-200">REJECTED</span>`;
-                case "🛒 Purchased":
-                    return `<span class="bg-blue-50 text-blue-700 px-2.5 py-1 rounded-full font-bold text-xxs tracking-wider border border-blue-200">PURCHASED</span>`;
-                case "📦 Received":
-                    return `<span class="bg-indigo-50 text-indigo-700 px-2.5 py-1 rounded-full font-bold text-xxs tracking-wider border border-indigo-200">RECEIVED</span>`;
-                default:
-                    return `<span class="bg-slate-50 text-slate-600 px-2.5 py-1 rounded-full font-bold text-xxs border border-slate-200">${status}</span>`;
-            }
-        }
+              {/* Action Buttons */}
+              <div className="flex justify-end gap-3 pt-4 border-t border-slate-200 dark:border-slate-700">
+                <button 
+                  type="button" 
+                  onClick={() => setIsModalOpen(false)}
+                  className="px-4 py-2 text-slate-500 hover:text-slate-700 font-semibold text-sm dark:text-slate-300 dark:hover:text-white"
+                >
+                  Batal
+                </button>
+                <button 
+                  type="submit" 
+                  className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-6 py-2.5 rounded-lg text-sm transition-all active:scale-95 shadow-md flex items-center gap-2"
+                >
+                  <Send className="w-4 h-4" /> Kirim Permintaan
+                </button>
+              </div>
 
-        // Action Buttons based on User Access Roles
-        function getActionButtons(item) {
-            let actions = "";
-            const encodedName = encodeURIComponent(`Halo, saya ingin menanyakan status logistik ${item.namaBarang} (${item.qty} pcs) untuk cabang ${item.cabang}.`);
-            const waButton = `
-                <a href="https://wa.me/628123456789?text=${encodedName}" target="_blank" class="bg-emerald-50 hover:bg-emerald-100 text-emerald-600 border border-emerald-300 rounded-lg p-1.5 text-xs font-bold flex items-center justify-center space-x-1 transition-all" title="Kirim WhatsApp">
-                    <i class="fa-brands fa-whatsapp text-sm"></i>
-                </a>
-            `;
+            </form>
+          </div>
+        </div>
+      )}
 
-            // EXECUTIVE APPROVAL ACTION
-            if (currentRole === "Executive" && item.status === "⏳ Pending Approval") {
-                actions += `
-                    <button onclick="changeStatus(${item.id}, '✅ Approved')" class="bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg px-2.5 py-1 text-xxs font-bold transition-all shadow-sm">
-                        Approve
-                    </button>
-                    <button onclick="changeStatus(${item.id}, '❌ Rejected')" class="bg-red-50 hover:bg-red-100 text-red-600 border border-red-300 rounded-lg px-2 py-1 text-xxs font-bold transition-all">
-                        Reject
-                    </button>
-                `;
-            }
 
-            // STORE MANAGER / ADMIN PROCUREMENT ACTION
-            if (currentRole === "StoreManager") {
-                if (item.status === "📝 Draft") {
-                    actions += `
-                        <button onclick="changeStatus(${item.id}, '⏳ Pending Approval')" class="bg-primary-600 hover:bg-primary-700 text-white rounded-lg px-2.5 py-1 text-xxs font-bold transition-all shadow-sm">
-                            Kirim Approval
-                        </button>
-                    `;
-                } else if (item.status === "✅ Approved") {
-                    actions += `
-                        <button onclick="changeStatus(${item.id}, '🛒 Purchased')" class="bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg px-2.5 py-1 text-xxs font-bold transition-all shadow-sm">
-                            Beli (Purchase)
-                        </button>
-                    `;
-                } else if (item.status === "🛒 Purchased") {
-                    actions += `
-                        <button onclick="changeStatus(${item.id}, '📦 Received')" class="bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg px-2.5 py-1 text-xxs font-bold transition-all shadow-sm">
-                            Diterima (Received)
-                        </button>
-                    `;
-                }
-            }
+      {/* ========================================================================= */}
+      {/* --- MODAL DETAIL & MANAJEMEN PERSETUJUAN --- */}
+      {/* ========================================================================= */}
+      {isDetailModalOpen && selectedRequest && (
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-black bg-opacity-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-3xl w-full p-6 shadow-2xl relative overflow-hidden dark:bg-slate-800 dark:text-white">
+            
+            {/* Header Detail */}
+            <div className="flex justify-between items-start border-b pb-4 mb-4 dark:border-slate-700">
+              <div>
+                <span className="text-[10px] uppercase font-extrabold tracking-wider bg-slate-100 text-slate-700 px-2 py-0.5 rounded dark:bg-slate-700 dark:text-slate-300">
+                  {selectedRequest.kategori}
+                </span>
+                <h3 className="text-xl font-bold text-slate-900 mt-1 dark:text-white">
+                  Detail: {selectedRequest.namaBarang}
+                </h3>
+              </div>
+              
+              <button 
+                onClick={() => setIsDetailModalOpen(false)}
+                className="text-slate-400 hover:text-slate-600 text-2xl font-bold dark:hover:text-white"
+              >
+                &times;
+              </button>
+            </div>
 
-            actions += waButton;
-            return actions || `<span class="text-xxs text-slate-400">-</span>`;
-        }
-
-        // Ubah Status secara lokal (atau memberikan notice jika database terkunci)
-        function changeStatus(id, newStatus) {
-            const index = database.findIndex(i => i.id === id);
-            if (index !== -1) {
-                database[index].status = newStatus;
+            {/* Konten Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              
+              {/* Kolom Kiri: Detil Info Form */}
+              <div className="space-y-4">
                 
-                // Jika status Approved / Received, isi tanggal terakhir pembelian
-                if (newStatus === "📦 Received" || newStatus === "🛒 Purchased") {
-                    const today = new Date();
-                    const formattedDate = `${String(today.getDate()).padStart(2, '0')}/${String(today.getMonth() + 1).padStart(2, '0')}/${today.getFullYear()}`;
-                    database[index].tglBeli = formattedDate;
-                }
+                <div className="bg-slate-50 p-4 rounded-xl space-y-3 dark:bg-slate-700/50">
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">Informasi Permintaan</h4>
+                  
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <div>
+                      <p className="text-slate-500 dark:text-slate-400">Tanggal Request:</p>
+                      <p className="font-semibold">{selectedRequest.tglRequest}</p>
+                    </div>
+                    <div>
+                      <p className="text-slate-500 dark:text-slate-400">Tgl Terakhir Beli:</p>
+                      <p className="font-semibold">{selectedRequest.tglTerakhirPembelian || '-'}</p>
+                    </div>
+                    <div>
+                      <p className="text-slate-500 dark:text-slate-400">Pemohon (PIC):</p>
+                      <p className="font-semibold">{selectedRequest.pemohon}</p>
+                    </div>
+                    <div>
+                      <p className="text-slate-500 dark:text-slate-400">WhatsApp PIC:</p>
+                      <p className="font-semibold text-emerald-600 dark:text-emerald-400">{selectedRequest.whatsapp}</p>
+                    </div>
+                    <div>
+                      <p className="text-slate-500 dark:text-slate-400">Cabang:</p>
+                      <p className="font-semibold">{selectedRequest.cabang}</p>
+                    </div>
+                    <div>
+                      <p className="text-slate-500 dark:text-slate-400">Untuk Divisi:</p>
+                      <p className="font-semibold">{selectedRequest.divisi}</p>
+                    </div>
+                    <div>
+                      <p className="text-slate-500 dark:text-slate-400">Jumlah / Qty:</p>
+                      <p className="font-bold text-slate-800 dark:text-white">{selectedRequest.qty} unit/item</p>
+                    </div>
+                    <div>
+                      <p className="text-slate-500 dark:text-slate-400">Media / Toko:</p>
+                      <p className="font-semibold text-indigo-600 dark:text-indigo-400">{selectedRequest.media}</p>
+                    </div>
+                  </div>
+                </div>
 
-                // Beri notifikasi ke user bahwa data di-edit secara lokal
-                const savedUrl = localStorage.getItem("sheetsCsvUrl");
-                if (savedUrl) {
-                    showNotification("info", "Pembaruan Lokal Berhasil", "Status telah diperbarui di browser Anda. Harap diperbarui secara manual pada file Google Sheets Anda untuk menyimpan secara permanen.");
-                } else {
-                    showNotification("success", "Pembaruan Berhasil", "Status logistik berhasil diubah.");
-                }
+                <div className="bg-slate-50 p-4 rounded-xl dark:bg-slate-700/50">
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-slate-600 mb-1 dark:text-slate-300">Catatan Pemohon:</h4>
+                  <p className="text-sm italic text-slate-700 dark:text-slate-300">
+                    "{selectedRequest.notes || 'Tidak ada catatan khusus.'}"
+                  </p>
+                </div>
 
-                applyFilters();
-                renderDashboard();
-            }
-        }
-
-        // Form Submit handler
-        function handleFormSubmit(event) {
-            event.preventDefault();
-
-            const today = new Date();
-            const formattedDate = `${String(today.getDate()).padStart(2, '0')}/${String(today.getMonth() + 1).padStart(2, '0')}/${today.getFullYear()}`;
-
-            const newRequest = {
-                id: database.length + 1,
-                tglRequest: formattedDate,
-                tglBeli: "",
-                cabang: document.getElementById("formCabang").value,
-                pemohon: document.getElementById("formPemohon").value,
-                divisi: document.getElementById("formDivisi").value,
-                kategori: document.getElementById("formKategori").value,
-                namaBarang: document.getElementById("formNamaBarang").value,
-                qty: parseInt(document.getElementById("formQty").value),
-                alasan: document.getElementById("formAlasan").value,
-                media: document.getElementById("formMedia").value || "",
-                status: "📝 Draft", // Default draft status
-                harga: parseFloat(document.getElementById("formHarga").value) || 0
-            };
-
-            // Masukkan data baru ke database memori
-            database.unshift(newRequest);
-            filteredDatabase = [...database];
-            
-            // Notification & reset
-            showNotification("success", "Pengajuan Dibuat", `Logistik ${newRequest.namaBarang} berhasil diajukan dengan status Draft.`);
-            resetForm();
-            switchTab('requests');
-            updateAppUI();
-        }
-
-        function resetForm() {
-            document.getElementById("requestForm").reset();
-        }
-
-        // Pagination Logic
-        function updatePagination(totalItems) {
-            const totalPages = Math.ceil(totalItems / itemsPerPage);
-            const info = document.getElementById("paginationInfo");
-            const controls = document.getElementById("paginationControls");
-
-            if (totalItems === 0) {
-                info.innerText = "Menampilkan 0 data";
-                controls.innerHTML = "";
-                return;
-            }
-
-            const start = ((currentPage - 1) * itemsPerPage) + 1;
-            const end = Math.min(currentPage * itemsPerPage, totalItems);
-            info.innerText = `Menampilkan ${start}-${end} dari ${totalItems} data`;
-
-            controls.innerHTML = "";
-
-            // Previous Button
-            controls.innerHTML += `
-                <button onclick="changePage(${currentPage - 1})" ${currentPage === 1 ? 'disabled' : ''} class="px-2.5 py-1.5 text-xs font-semibold rounded-lg border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-50 disabled:hover:bg-white transition-all">
-                    <i class="fa-solid fa-chevron-left text-xxs"></i>
-                </button>
-            `;
-
-            // Page numbers
-            for (let i = 1; i <= totalPages; i++) {
-                const isActive = i === currentPage;
-                controls.innerHTML += `
-                    <button onclick="changePage(${i})" class="px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${isActive ? 'bg-primary-600 text-white' : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50'}">
-                        ${i}
+                <div className="flex gap-2">
+                  <button 
+                    onClick={() => sendWhatsAppMessage(selectedRequest)}
+                    className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2.5 rounded-lg text-xs flex items-center justify-center gap-2 transition-all active:scale-95"
+                  >
+                    <MessageSquare className="w-4 h-4" /> Chat Whatsapp (PIC)
+                  </button>
+                  
+                  {/* Delete Button (Sesuai Role) */}
+                  {(currentRole === 'finance' || selectedRequest.createdBy === user?.uid) && (
+                    <button 
+                      onClick={() => handleDeleteRequest(selectedRequest.id)}
+                      className="bg-rose-50 text-rose-600 hover:bg-rose-100 p-2.5 rounded-lg border border-rose-200 dark:bg-rose-950 dark:text-rose-300 dark:border-rose-900"
+                      title="Hapus Data"
+                    >
+                      <Trash2 className="w-5 h-5" />
                     </button>
-                `;
-            }
+                  )}
+                </div>
 
-            // Next Button
-            controls.innerHTML += `
-                <button onclick="changePage(${currentPage + 1})" ${currentPage === totalPages ? 'disabled' : ''} class="px-2.5 py-1.5 text-xs font-semibold rounded-lg border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-50 disabled:hover:bg-white transition-all">
-                    <i class="fa-solid fa-chevron-right text-xxs"></i>
-                </button>
-            `;
-        }
+              </div>
 
-        function changePage(page) {
-            currentPage = page;
-            renderRequestTable();
-        }
+              {/* Kolom Kanan: Status & Persetujuan (Interactive Role) */}
+              <div className="space-y-4">
+                
+                {/* Panel Status Saat Ini & Estimasi Finansial */}
+                <div className="bg-slate-100 p-4 rounded-xl dark:bg-slate-700">
+                  <div className="flex justify-between items-center mb-3">
+                    <span className="text-xs font-bold uppercase text-slate-500 dark:text-slate-400">Status Saat Ini</span>
+                    <span className={`text-xs px-2.5 py-1 rounded-full font-extrabold uppercase ${
+                      selectedRequest.status === 'Pending' ? 'bg-amber-100 text-amber-800' :
+                      selectedRequest.status === 'Approved' ? 'bg-sky-100 text-sky-800' :
+                      selectedRequest.status === 'Completed' ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'
+                    }`}>
+                      {selectedRequest.status}
+                    </span>
+                  </div>
 
-        // Visualisasi Chart Rendering
-        function renderCharts() {
-            // Hancurkan chart sebelumnya agar tidak terjadi glitch tumpang tindih
-            if (categoryChartInstance) categoryChartInstance.destroy();
-            if (statusChartInstance) statusChartInstance.destroy();
+                  <div className="border-t border-slate-200 pt-3 dark:border-slate-600">
+                    <p className="text-xs text-slate-500 dark:text-slate-400">Harga Satuan:</p>
+                    <p className="text-xl font-bold text-slate-800 dark:text-white">
+                      Rp {selectedRequest.harga ? selectedRequest.harga.toLocaleString('id-ID') : '0'}
+                    </p>
+                    <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">
+                      Total Estimasi: Rp {((selectedRequest.harga || 0) * selectedRequest.qty).toLocaleString('id-ID')}
+                    </p>
+                  </div>
+                </div>
 
-            // Aggregasi Data Kategori
-            const catStats = {};
-            database.forEach(item => {
-                const cat = item.kategori || "Lainnya";
-                if (!catStats[cat]) catStats[cat] = 0;
-                if (item.status === "📦 Received" || item.status === "✅ Approved" || item.status === "🛒 Purchased") {
-                    catStats[cat] += (item.harga * item.qty);
-                }
-            });
+                {/* AREA MANAGER PERSUBALAN */}
+                {currentRole === 'manager' && selectedRequest.status === 'Pending' && (
+                  <div className="border-2 border-indigo-200 rounded-xl p-4 bg-indigo-50/50 dark:border-indigo-900 dark:bg-indigo-950/20">
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-indigo-700 mb-2 dark:text-indigo-400">Panel Persetujuan Manager</h4>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">Tinjau urgensi & media barang sebelum mengambil keputusan.</p>
+                    
+                    <div className="flex gap-2">
+                      <button 
+                        onClick={() => handleUpdateStatus(selectedRequest.id, 'Approved', 'Disetujui oleh Manager untuk segera dibeli.')}
+                        className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 px-3 rounded-lg text-xs flex items-center justify-center gap-1"
+                      >
+                        <CheckCircle className="w-3.5 h-3.5" /> Setujui Permintaan
+                      </button>
+                      <button 
+                        onClick={() => {
+                          const note = window.prompt("Berikan alasan penolakan:");
+                          if (note !== null) handleUpdateStatus(selectedRequest.id, 'Rejected', `Ditolak Manager: ${note}`);
+                        }}
+                        className="bg-rose-600 hover:bg-rose-700 text-white font-bold py-2 px-3 rounded-lg text-xs flex items-center justify-center gap-1"
+                      >
+                        <XCircle className="w-3.5 h-3.5" /> Tolak
+                      </button>
+                    </div>
+                  </div>
+                )}
 
-            const catLabels = Object.keys(catStats);
-            const catValues = Object.values(catStats);
+                {/* AREA FINANCE / PURCHASING UPDATE DETAIL */}
+                {currentRole === 'finance' && (
+                  <div className="border-2 border-purple-200 rounded-xl p-4 bg-purple-50/50 dark:border-purple-900 dark:bg-purple-950/20">
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-purple-700 mb-2 dark:text-purple-400">Panel Finance / Pembelian</h4>
+                    
+                    <form onSubmit={(e) => {
+                      e.preventDefault();
+                      const targetHarga = e.target.elements.finHarga.value;
+                      const targetNotes = e.target.elements.finNotes.value;
+                      handleUpdateFinanceDetails(selectedRequest.id, targetHarga, targetNotes);
+                    }} className="space-y-3">
+                      
+                      <div>
+                        <label className="block text-[10px] font-bold uppercase text-slate-500 dark:text-slate-400">Update Harga Fix (Rp)</label>
+                        <input 
+                          type="number" 
+                          name="finHarga"
+                          defaultValue={selectedRequest.harga}
+                          className="w-full border rounded p-1.5 text-xs dark:bg-slate-700 dark:border-slate-600"
+                        />
+                      </div>
 
-            const categoryCtx = document.getElementById("categoryChart").getContext("2d");
-            categoryChartInstance = new Chart(categoryCtx, {
-                type: 'bar',
-                data: {
-                    labels: catLabels,
-                    datasets: [{
-                        label: 'Total Biaya Disetujui (Rp)',
-                        data: catValues,
-                        backgroundColor: '#0284c7',
-                        borderRadius: 8,
-                        hoverBackgroundColor: '#0369a1'
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    scales: {
-                        y: {
-                            beginAtZero: true,
-                            ticks: {
-                                callback: function(value) {
-                                    return 'Rp ' + value.toLocaleString('id-ID');
-                                }
-                            }
-                        }
-                    },
-                    plugins: {
-                        legend: { display: false }
-                    }
-                }
-            });
+                      <div>
+                        <label className="block text-[10px] font-bold uppercase text-slate-500 dark:text-slate-400">Catatan Finance / Link Pembelian</label>
+                        <input 
+                          type="text" 
+                          name="finNotes"
+                          defaultValue={selectedRequest.notes}
+                          className="w-full border rounded p-1.5 text-xs dark:bg-slate-700 dark:border-slate-600"
+                          placeholder="Link Tokopedia / Info Toko Offline"
+                        />
+                      </div>
 
-            // Aggregasi Data Status
-            const statStats = {};
-            database.forEach(item => {
-                const stat = item.status || "Draft";
-                if (!statStats[stat]) statStats[stat] = 0;
-                statStats[stat]++;
-            });
+                      <div className="flex gap-2 pt-1">
+                        <button 
+                          type="submit"
+                          className="bg-purple-600 hover:bg-purple-700 text-white font-semibold py-1.5 px-3 rounded text-[11px]"
+                        >
+                          Simpan Rincian Finance
+                        </button>
 
-            const statLabels = Object.keys(statStats);
-            const statValues = Object.values(statStats);
+                        {selectedRequest.status === 'Approved' && (
+                          <button 
+                            type="button"
+                            onClick={() => handleUpdateStatus(selectedRequest.id, 'Completed', 'Barang berhasil diproses bayar dan dibeli oleh Finance.')}
+                            className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-1.5 px-3 rounded text-[11px] flex-1"
+                          >
+                            Tandai Selesai Dibeli
+                          </button>
+                        )}
+                      </div>
 
-            const statusCtx = document.getElementById("statusChart").getContext("2d");
-            statusChartInstance = new Chart(statusCtx, {
-                type: 'doughnut',
-                data: {
-                    labels: statLabels,
-                    datasets: [{
-                        data: statValues,
-                        backgroundColor: [
-                            '#f1f5f9', // Draft
-                            '#fef3c7', // Pending
-                            '#d1fae5', // Approved
-                            '#fee2e2', // Rejected
-                            '#dbeafe', // Purchased
-                            '#e0e7ff'  // Received
-                        ],
-                        borderColor: [
-                            '#cbd5e1', '#f59e0b', '#10b981', '#ef4444', '#3b82f6', '#6366f1'
-                        ],
-                        borderWidth: 1
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: {
-                            position: 'bottom',
-                            labels: {
-                                boxWidth: 12,
-                                font: { size: 10 }
-                            }
-                        }
-                    }
-                }
-            });
-        }
+                    </form>
+                  </div>
+                )}
 
-        // Utility: Format Rupiah Currency
-        function formatRupiah(value) {
-            return new Intl.NumberFormat('id-ID', {
-                style: 'currency',
-                currency: 'IDR',
-                minimumFractionDigits: 0
-            }).format(value);
-        }
+                {/* LOG RIWAYAT ALUR KERJA */}
+                <div className="bg-slate-50 p-4 rounded-xl dark:bg-slate-700/50">
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-slate-600 mb-2 dark:text-slate-300">Alur Riwayat Pengajuan:</h4>
+                  
+                  <div className="space-y-2.5 max-h-40 overflow-y-auto pr-1 text-xs">
+                    {(selectedRequest.historyLog || []).map((log, index) => (
+                      <div key={index} className="flex gap-2 border-l-2 border-indigo-400 pl-2 py-0.5">
+                        <div>
+                          <div className="font-bold">{log.status} <span className="font-normal text-[10px] text-slate-400">({log.by})</span></div>
+                          <div className="text-[10px] text-slate-500">{new Date(log.time).toLocaleString('id-ID')}</div>
+                          <p className="text-slate-600 dark:text-slate-300 mt-0.5">{log.note}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
 
-        // Custom Notification Handler
-        function showNotification(type, title, desc) {
-            const alertBox = document.getElementById("customAlert");
-            const alertTitle = document.getElementById("alertTitle");
-            const alertDesc = document.getElementById("alertDesc");
-            const alertIcon = document.getElementById("alertIcon");
+                </div>
 
-            alertTitle.innerText = title;
-            alertDesc.innerText = desc;
+              </div>
 
-            if (type === "success") {
-                alertBox.className = "mb-6 p-4 rounded-xl border flex items-start space-x-3 bg-emerald-50 text-emerald-800 border-emerald-200";
-                alertIcon.innerHTML = `<i class="fa-solid fa-circle-check text-emerald-500 text-lg"></i>`;
-            } else if (type === "error") {
-                alertBox.className = "mb-6 p-4 rounded-xl border flex items-start space-x-3 bg-rose-50 text-rose-800 border-rose-200";
-                alertIcon.innerHTML = `<i class="fa-solid fa-circle-xmark text-rose-500 text-lg"></i>`;
-            } else {
-                alertBox.className = "mb-6 p-4 rounded-xl border flex items-start space-x-3 bg-blue-50 text-blue-800 border-blue-200";
-                alertIcon.innerHTML = `<i class="fa-solid fa-circle-info text-blue-500 text-lg"></i>`;
-            }
+            </div>
 
-            alertBox.classList.remove("hidden");
-            // Auto hide after 6 seconds
-            setTimeout(closeAlert, 6000);
-        }
+          </div>
+        </div>
+      )}
 
-        function closeAlert() {
-            document.getElementById("customAlert").classList.add("hidden");
-        }
-    </script>
-</body>
-</html>
+    </div>
+  );
+}
