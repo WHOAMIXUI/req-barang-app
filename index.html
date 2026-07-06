@@ -3,13 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>E-Request Items System</title>
+    <title>E-Request Items System - Professional Edition</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Inter Font -->
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <!-- Lucide Icons -->
     <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         body {
             font-family: 'Inter', sans-serif;
@@ -28,22 +30,27 @@
         .custom-scroll::-webkit-scrollbar-thumb:hover {
             background: #94a3b8;
         }
+        .sidebar-active {
+            background-color: #4f46e5;
+            color: #ffffff;
+            box-shadow: 0 4px 12px rgba(79, 70, 229, 0.25);
+        }
     </style>
 </head>
-<body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col">
+<body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col overflow-x-hidden">
 
     <!-- APP CONTAINER -->
     <div id="app" class="flex-grow flex flex-col">
         
-        <!-- LOGIN SECTION (GATED ACCESS) -->
-        <div id="login-section" class="flex-grow flex items-center justify-center px-4 py-12 bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900">
+        <!-- ================= LOGIN SECTION ================= -->
+        <div id="login-section" class="flex-grow flex items-center justify-center px-4 py-12 bg-gradient-to-br from-slate-950 via-indigo-950 to-slate-900">
             <div class="bg-white/95 backdrop-blur-md p-8 rounded-2xl shadow-2xl w-full max-w-md border border-slate-200/50 transition-all duration-300">
                 <div class="text-center mb-8">
                     <div class="inline-flex p-3 bg-indigo-50 text-indigo-600 rounded-2xl mb-3">
                         <i data-lucide="shield-check" class="w-8 h-8"></i>
                     </div>
                     <h1 class="text-2xl font-bold text-slate-900">E-Request Items</h1>
-                    <p class="text-sm text-slate-500 mt-1">Silakan masuk untuk mengakses sistem pengajuan barang</p>
+                    <p class="text-sm text-slate-500 mt-1">Masuk dengan kredensial Anda untuk mengakses sistem</p>
                 </div>
 
                 <div id="login-error" class="hidden mb-4 p-3 bg-rose-50 border border-rose-200 text-rose-700 text-sm rounded-xl flex items-center gap-2">
@@ -79,7 +86,7 @@
 
                     <button type="submit" 
                         class="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-xl shadow-lg shadow-indigo-600/20 transition-all duration-200 flex items-center justify-center gap-2">
-                        <span>Masuk ke Dashboard</span>
+                        <span>Masuk ke Sistem</span>
                         <i data-lucide="arrow-right" class="w-4 h-4"></i>
                     </button>
                 </form>
@@ -94,214 +101,315 @@
             </div>
         </div>
 
-        <!-- MAIN DASHBOARD SECTION (HIDDEN BY DEFAULT) -->
-        <div id="dashboard-section" class="hidden flex-grow flex flex-col">
-            <!-- Navigation Header -->
-            <header class="bg-white border-b border-slate-200 sticky top-0 z-40">
-                <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                    <div class="flex items-center justify-between h-16">
-                        <!-- Brand/Logo -->
-                        <div class="flex items-center gap-3">
-                            <div class="p-2 bg-indigo-600 text-white rounded-xl">
-                                <i data-lucide="layers" class="w-6 h-6"></i>
+        <!-- ================= MAIN CORE PANEL (HIDDEN BY DEFAULT) ================= -->
+        <div id="main-panel" class="hidden flex-grow flex flex-col md:flex-row">
+            
+            <!-- LEFT SIDEBAR -->
+            <aside class="w-full md:w-64 bg-slate-900 text-slate-300 flex-shrink-0 flex flex-col border-r border-slate-800">
+                <!-- Brand Header -->
+                <div class="p-6 border-b border-slate-800 flex items-center justify-between">
+                    <div class="flex items-center gap-3">
+                        <div class="p-2 bg-indigo-600 text-white rounded-xl">
+                            <i data-lucide="layers" class="w-6 h-6"></i>
+                        </div>
+                        <div>
+                            <h1 class="text-lg font-bold text-white leading-none">E-Request</h1>
+                            <span class="text-[10px] text-slate-400 font-medium tracking-wide uppercase">System Dashboard</span>
+                        </div>
+                    </div>
+                    <!-- Mobile Hamburger Button to Toggle Menu (Controlled by JS) -->
+                    <button id="sidebar-close-mobile" class="md:hidden p-1 hover:bg-slate-800 rounded text-slate-400">
+                        <i data-lucide="x" class="w-5 h-5"></i>
+                    </button>
+                </div>
+
+                <!-- Navigation Menus -->
+                <nav class="flex-grow p-4 space-y-2 overflow-y-auto custom-scroll">
+                    <button onclick="switchTab('dashboard-tab')" id="nav-dashboard-tab" class="w-full flex items-center gap-3 px-4 py-3 text-sm font-semibold rounded-xl text-slate-400 hover:text-white hover:bg-slate-800/50 transition-all duration-200">
+                        <i data-lucide="layout-dashboard" class="w-5 h-5"></i>
+                        <span>Ringkasan Dashboard</span>
+                    </button>
+                    <button onclick="switchTab('requests-tab')" id="nav-requests-tab" class="w-full flex items-center gap-3 px-4 py-3 text-sm font-semibold rounded-xl text-slate-400 hover:text-white hover:bg-slate-800/50 transition-all duration-200">
+                        <i data-lucide="clipboard-list" class="w-5 h-5"></i>
+                        <span>Daftar Pengajuan</span>
+                    </button>
+                    <button onclick="switchTab('settings-tab')" id="nav-settings-tab" class="w-full flex items-center gap-3 px-4 py-3 text-sm font-semibold rounded-xl text-slate-400 hover:text-white hover:bg-slate-800/50 transition-all duration-200">
+                        <i data-lucide="settings-2" class="w-5 h-5"></i>
+                        <span>Pengaturan & Sync</span>
+                    </button>
+                </nav>
+
+                <!-- Profile Footer Section -->
+                <div class="p-4 border-t border-slate-800 bg-slate-950/40">
+                    <div class="flex items-center gap-3 mb-4">
+                        <div class="w-10 h-10 rounded-full bg-indigo-600 flex items-center justify-center text-white font-bold text-sm">
+                            AD
+                        </div>
+                        <div class="text-left overflow-hidden">
+                            <div class="text-xs font-semibold text-white truncate">Administrator</div>
+                            <div class="text-[10px] text-slate-500 font-medium truncate">admin@erequest.com</div>
+                        </div>
+                    </div>
+                    <button id="btn-logout" class="w-full py-2 bg-slate-800 hover:bg-rose-900/40 hover:text-rose-400 text-xs font-semibold rounded-xl text-slate-400 transition-all flex items-center justify-center gap-2">
+                        <i data-lucide="log-out" class="w-3.5 h-3.5"></i>
+                        <span>Keluar Sesi</span>
+                    </button>
+                </div>
+            </aside>
+
+            <!-- MAIN CONTENT WRAPPER -->
+            <div class="flex-grow flex flex-col overflow-y-auto custom-scroll max-h-screen">
+                
+                <!-- Top Responsive Navbar Header -->
+                <header class="bg-white border-b border-slate-200 h-16 flex items-center px-6 justify-between sticky top-0 z-20">
+                    <div class="flex items-center gap-3">
+                        <button id="sidebar-open-mobile" class="md:hidden p-1.5 hover:bg-slate-100 rounded-lg text-slate-600">
+                            <i data-lucide="menu" class="w-6 h-6"></i>
+                        </button>
+                        <h2 class="font-bold text-slate-800 text-lg md:text-xl" id="header-page-title">Ringkasan Dashboard</h2>
+                    </div>
+
+                    <!-- Connection Quick Status Badge -->
+                    <div class="flex items-center gap-3">
+                        <span id="quick-status-badge" class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-amber-50 text-amber-700 border border-amber-100">
+                            <span class="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
+                            Mode Lokal
+                        </span>
+                    </div>
+                </header>
+
+                <!-- MAIN WORKSPACE -->
+                <main class="p-6 space-y-6 flex-grow">
+                    
+                    <!-- ================= TAB 1: RINGKASAN DASHBOARD (ANALYTICS & CHARTS) ================= -->
+                    <div id="dashboard-tab" class="tab-content space-y-6">
+                        <!-- KPI / Summary Cards Grid -->
+                        <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                            <!-- Total Request -->
+                            <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+                                <div class="space-y-1">
+                                    <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Total Request</span>
+                                    <div class="text-2xl font-bold text-slate-900" id="kpi-total">0</div>
+                                </div>
+                                <div class="p-3 bg-indigo-50 text-indigo-600 rounded-xl">
+                                    <i data-lucide="clipboard-list" class="w-6 h-6"></i>
+                                </div>
                             </div>
-                            <div>
-                                <h1 class="text-lg font-bold text-slate-900 leading-none">E-Request</h1>
-                                <span class="text-[10px] text-slate-500 font-medium tracking-wide uppercase">Items Management</span>
+                            <!-- Pending -->
+                            <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+                                <div class="space-y-1">
+                                    <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Menunggu</span>
+                                    <div class="text-2xl font-bold text-amber-600" id="kpi-pending">0</div>
+                                </div>
+                                <div class="p-3 bg-amber-50 text-amber-600 rounded-xl">
+                                    <i data-lucide="clock" class="w-6 h-6"></i>
+                                </div>
+                            </div>
+                            <!-- Approved -->
+                            <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+                                <div class="space-y-1">
+                                    <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Disetujui</span>
+                                    <div class="text-2xl font-bold text-emerald-600" id="kpi-approved">0</div>
+                                </div>
+                                <div class="p-3 bg-emerald-50 text-emerald-600 rounded-xl">
+                                    <i data-lucide="check-circle-2" class="w-6 h-6"></i>
+                                </div>
+                            </div>
+                            <!-- Rejected -->
+                            <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+                                <div class="space-y-1">
+                                    <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Ditolak</span>
+                                    <div class="text-2xl font-bold text-rose-600" id="kpi-rejected">0</div>
+                                </div>
+                                <div class="p-3 bg-rose-50 text-rose-600 rounded-xl">
+                                    <i data-lucide="x-circle" class="w-6 h-6"></i>
+                                </div>
                             </div>
                         </div>
 
-                        <!-- Actions / Profile -->
-                        <div class="flex items-center gap-4">
-                            <button id="btn-show-sync-guide" class="hidden md:flex items-center gap-2 px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-semibold rounded-lg border border-emerald-200 transition-all">
-                                <span class="relative flex h-2 w-2">
-                                    <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                                    <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-                                </span>
-                                <i data-lucide="table-properties" class="w-3.5 h-3.5"></i>
-                                Hubungkan ke Spreadsheet
-                            </button>
-
-                            <button id="btn-show-github-guide" class="hidden md:flex items-center gap-2 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-lg border border-slate-300 transition-all">
-                                <i data-lucide="github" class="w-3.5 h-3.5"></i>
-                                Upload ke GitHub
-                            </button>
-
-                            <div class="h-6 w-px bg-slate-200"></div>
-
-                            <div class="flex items-center gap-3">
-                                <div class="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700 font-bold text-sm">
-                                    AD
+                        <!-- CHARTS INSIGHTS SECTION -->
+                        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                            <!-- Chart 1: Urgensi (Doughnut) -->
+                            <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
+                                <div class="mb-4">
+                                    <h3 class="font-bold text-slate-800 text-sm">Tingkat Urgensi Pengajuan</h3>
+                                    <p class="text-xs text-slate-400 mt-1">Pembagian tingkat mendesaknya permohonan</p>
                                 </div>
-                                <div class="hidden sm:block text-left">
-                                    <div class="text-xs font-semibold text-slate-800">Administrator</div>
-                                    <div class="text-[10px] text-slate-400 font-medium">admin@erequest.com</div>
+                                <div class="relative w-full max-w-[200px] mx-auto h-[200px]">
+                                    <canvas id="urgencyChart"></canvas>
                                 </div>
-                                <button id="btn-logout" class="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all" title="Keluar">
-                                    <i data-lucide="log-out" class="w-5 h-5"></i>
+                            </div>
+
+                            <!-- Chart 2: Cabang (Bar Chart) -->
+                            <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between lg:col-span-2">
+                                <div class="mb-4">
+                                    <h3 class="font-bold text-slate-800 text-sm">Distribusi Permintaan per Cabang</h3>
+                                    <p class="text-xs text-slate-400 mt-1">Frekuensi pengajuan dari tiap-tiap kantor cabang</p>
+                                </div>
+                                <div class="w-full h-[200px]">
+                                    <canvas id="branchChart"></canvas>
+                                </div>
+                            </div>
+
+                            <!-- Chart 3: Kategori Alokasi (Polar Area or Bar Chart) -->
+                            <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between lg:col-span-3">
+                                <div class="mb-4">
+                                    <h3 class="font-bold text-slate-800 text-sm">Alokasi Berdasarkan Kategori Barang</h3>
+                                    <p class="text-xs text-slate-400 mt-1">Pembagian jenis inventaris barang yang diajukan</p>
+                                </div>
+                                <div class="w-full h-[220px]">
+                                    <canvas id="categoryChart"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- ================= TAB 2: DAFTAR REQUEST (TABLE & FILTERS) ================= -->
+                    <div id="requests-tab" class="tab-content hidden space-y-6">
+                        <!-- Request Management Card -->
+                        <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
+                            <!-- Control Bar -->
+                            <div class="p-5 border-b border-slate-200 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                                <div class="flex flex-col md:flex-row items-stretch md:items-center gap-3 flex-grow max-w-3xl">
+                                    <!-- Search -->
+                                    <div class="relative flex-grow">
+                                        <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400">
+                                            <i data-lucide="search" class="w-4 h-4"></i>
+                                        </span>
+                                        <input type="text" id="table-search" placeholder="Cari nama barang, pemohon, cabang..."
+                                            class="w-full pl-9 pr-4 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all">
+                                    </div>
+                                    <!-- Cabang Filter -->
+                                    <select id="filter-branch" 
+                                        class="px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                                        <option value="ALL">Semua Cabang</option>
+                                        <option value="Cabang Jakarta">Cabang Jakarta</option>
+                                        <option value="Cabang Bandung">Cabang Bandung</option>
+                                        <option value="Cabang Surabaya">Cabang Surabaya</option>
+                                        <option value="Cabang Medan">Cabang Medan</option>
+                                        <option value="Cabang Makassar">Cabang Makassar</option>
+                                        <option value="Cabang Semarang">Cabang Semarang</option>
+                                        <option value="Cabang Yogyakarta">Cabang Yogyakarta</option>
+                                    </select>
+                                    <!-- Category Filter -->
+                                    <select id="filter-category" 
+                                        class="px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                                        <option value="ALL">Semua Kategori</option>
+                                        <option value="IT Equipment">IT Equipment</option>
+                                        <option value="Office Supplies">Office Supplies</option>
+                                        <option value="Furniture">Furniture</option>
+                                        <option value="Software">Software</option>
+                                        <option value="Others">Kategori Lainnya</option>
+                                    </select>
+                                    <!-- Status Filter -->
+                                    <select id="filter-status" 
+                                        class="px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                                        <option value="ALL">Semua Status</option>
+                                        <option value="Pending">Menunggu</option>
+                                        <option value="Approved">Disetujui</option>
+                                        <option value="Rejected">Ditolak</option>
+                                    </select>
+                                </div>
+
+                                <!-- Action Button -->
+                                <button id="btn-add-request" 
+                                    class="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-xl shadow-lg shadow-indigo-600/10 transition-all duration-200 flex items-center justify-center gap-2">
+                                    <i data-lucide="plus-circle" class="w-4.5 h-4.5"></i>
+                                    <span>Buat Pengajuan Baru</span>
+                                </button>
+                            </div>
+
+                            <!-- Responsive Table Container -->
+                            <div class="overflow-x-auto custom-scroll">
+                                <table class="w-full text-left border-collapse">
+                                    <thead>
+                                        <tr class="bg-slate-50 border-b border-slate-200 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                                            <th class="py-4 px-6 text-center">ID Request</th>
+                                            <th class="py-4 px-6">Informasi Pemohon</th>
+                                            <th class="py-4 px-6">Nama Barang / Kategori</th>
+                                            <th class="py-4 px-6 text-center">Jumlah / Est. Harga</th>
+                                            <th class="py-4 px-6 text-center">Tingkat Urgensi</th>
+                                            <th class="py-4 px-6 text-center">Status</th>
+                                            <th class="py-4 px-6 text-center">Aksi</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="request-table-body" class="divide-y divide-slate-200 text-sm">
+                                        <!-- Dynamic items inject here -->
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <!-- Empty State -->
+                            <div id="table-empty-state" class="hidden py-16 px-4 text-center">
+                                <div class="inline-flex p-4 bg-slate-100 text-slate-400 rounded-full mb-3">
+                                    <i data-lucide="database-backup" class="w-8 h-8"></i>
+                                </div>
+                                <h3 class="text-base font-bold text-slate-800">Tidak ada pengajuan ditemukan</h3>
+                                <p class="text-xs text-slate-400 mt-1">Coba sesuaikan pencarian Anda atau tambahkan pengajuan baru.</p>
+                            </div>
+
+                            <!-- Table Footer / Stats -->
+                            <div class="p-4 bg-slate-50 border-t border-slate-200 flex items-center justify-between text-xs text-slate-500">
+                                <div>Menampilkan <span id="table-shown-count" class="font-semibold text-slate-700">0</span> dari <span id="table-total-count" class="font-semibold text-slate-700">0</span> pengajuan</div>
+                                <div class="font-medium">Sesuai format data <span class="font-bold underline text-indigo-600">E-Request_Items_FINAL.xlsx</span></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- ================= TAB 3: PENGATURAN & SYNC ================= -->
+                    <div id="settings-tab" class="tab-content hidden space-y-6">
+                        <!-- Spreadsheet Connection Status Alert Banner -->
+                        <div class="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-6">
+                            <div class="flex items-start gap-4">
+                                <div class="p-3 bg-indigo-50 text-indigo-600 rounded-2xl flex-shrink-0">
+                                    <i data-lucide="database" class="w-6 h-6"></i>
+                                </div>
+                                <div class="space-y-1">
+                                    <h3 class="font-bold text-slate-900 text-sm">Penyimpanan Realtime Google Spreadsheet</h3>
+                                    <p class="text-xs text-slate-500">Secara default, data Anda disimpan secara lokal pada browser. Hubungkan ke **Google Spreadsheet** agar setiap kali diinput, data di spreadsheet Anda juga otomatis berubah secara live.</p>
+                                </div>
+                            </div>
+
+                            <div class="p-4 bg-slate-50 rounded-xl space-y-4">
+                                <label class="block text-xs font-bold text-slate-600 uppercase tracking-wider">Web App URL (Google Apps Script)</label>
+                                <div class="flex flex-col md:flex-row items-stretch gap-2">
+                                    <input type="text" id="spreadsheet-url-input" placeholder="Masukkan Google Apps Script Web App URL berakhiran /exec..."
+                                        class="flex-grow px-4 py-2.5 bg-white text-xs border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                                    <button id="btn-save-sheets-url" class="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-xl transition-all shadow-md shadow-indigo-600/10">
+                                        Simpan & Hubungkan
+                                    </button>
+                                </div>
+                                <!-- Error Warning Helper -->
+                                <div id="url-validation-warning" class="hidden p-3.5 bg-rose-50 border border-rose-200 text-rose-800 text-xs rounded-xl flex items-center gap-2">
+                                    <i data-lucide="alert-triangle" class="w-4.5 h-4.5 text-rose-600 flex-shrink-0"></i>
+                                    <span>Peringatan: URL tampaknya adalah link editor Apps Script, bukan Web App URL (/exec). Silakan periksa kembali panduan integrasi!</span>
+                                </div>
+                            </div>
+
+                            <!-- Guide Access Buttons -->
+                            <div class="flex flex-wrap gap-3 pt-2">
+                                <button id="btn-show-sync-guide" class="flex items-center gap-2 px-4 py-2.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-semibold rounded-xl border border-emerald-200 transition-all">
+                                    <i data-lucide="table-properties" class="w-4 h-4"></i>
+                                    Petunjuk Setup Spreadsheet
+                                </button>
+                                <button id="btn-show-github-guide" class="flex items-center gap-2 px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-xl border border-slate-300 transition-all">
+                                    <i data-lucide="github" class="w-4 h-4"></i>
+                                    Petunjuk Upload GitHub Pages
                                 </button>
                             </div>
                         </div>
                     </div>
-                </div>
-            </header>
 
-            <!-- Main Content Area -->
-            <main class="flex-grow max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
-                <!-- Mobile Guide Buttons -->
-                <div class="flex flex-wrap gap-2 md:hidden">
-                    <button id="btn-show-sync-guide-mobile" class="flex-1 flex items-center justify-center gap-2 py-2 px-3 bg-emerald-50 text-emerald-700 text-xs font-semibold rounded-lg border border-emerald-200">
-                        <i data-lucide="table-properties" class="w-4 h-4"></i> Spreadsheet Sync
-                    </button>
-                    <button id="btn-show-github-guide-mobile" class="flex-1 flex items-center justify-center gap-2 py-2 px-3 bg-slate-100 text-slate-700 text-xs font-semibold rounded-lg border border-slate-300">
-                        <i data-lucide="github" class="w-4 h-4"></i> GitHub Upload
-                    </button>
-                </div>
+                </main>
 
-                <!-- Spreadsheet Connection Status Alert Banner -->
-                <div id="sheets-connection-banner" class="bg-indigo-50 border border-indigo-200 rounded-2xl p-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-                    <div class="flex items-start gap-3">
-                        <div class="p-2 bg-indigo-600 text-white rounded-xl mt-0.5 md:mt-0 flex-shrink-0">
-                            <i data-lucide="database" class="w-5 h-5"></i>
-                        </div>
-                        <div>
-                            <h3 class="font-bold text-slate-900 text-sm">Mode Penyimpanan Realtime Aktif</h3>
-                            <p class="text-xs text-slate-600 mt-1">Data Anda disimpan secara lokal. Sambungkan ke **Google Spreadsheet** agar setiap kali diinput, data di spreadsheet Anda juga otomatis berubah secara live.</p>
-                        </div>
-                    </div>
-                    <div class="flex items-center gap-2 w-full md:w-auto">
-                        <input type="text" id="spreadsheet-url-input" placeholder="Masukkan Google Apps Script Web App URL..."
-                            class="flex-grow md:w-80 px-3 py-2 bg-white text-xs border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                        <button id="btn-save-sheets-url" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-xl transition-all shadow-md shadow-indigo-600/10">
-                            Simpan
-                        </button>
-                    </div>
-                </div>
-
-                <!-- KPI / Summary Cards -->
-                <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                    <!-- Total Request -->
-                    <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
-                        <div class="space-y-1">
-                            <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Total Request</span>
-                            <div class="text-2xl font-bold text-slate-900" id="kpi-total">0</div>
-                        </div>
-                        <div class="p-3 bg-blue-50 text-blue-600 rounded-xl">
-                            <i data-lucide="clipboard-list" class="w-6 h-6"></i>
-                        </div>
-                    </div>
-                    <!-- Pending -->
-                    <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
-                        <div class="space-y-1">
-                            <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Menunggu</span>
-                            <div class="text-2xl font-bold text-amber-600" id="kpi-pending">0</div>
-                        </div>
-                        <div class="p-3 bg-amber-50 text-amber-600 rounded-xl">
-                            <i data-lucide="clock" class="w-6 h-6"></i>
-                        </div>
-                    </div>
-                    <!-- Approved -->
-                    <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
-                        <div class="space-y-1">
-                            <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Disetujui</span>
-                            <div class="text-2xl font-bold text-emerald-600" id="kpi-approved">0</div>
-                        </div>
-                        <div class="p-3 bg-emerald-50 text-emerald-600 rounded-xl">
-                            <i data-lucide="check-circle-2" class="w-6 h-6"></i>
-                        </div>
-                    </div>
-                    <!-- Rejected -->
-                    <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
-                        <div class="space-y-1">
-                            <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Ditolak</span>
-                            <div class="text-2xl font-bold text-rose-600" id="kpi-rejected">0</div>
-                        </div>
-                        <div class="p-3 bg-rose-50 text-rose-600 rounded-xl">
-                            <i data-lucide="x-circle" class="w-6 h-6"></i>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Request Management Card -->
-                <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
-                    <!-- Control Bar -->
-                    <div class="p-5 border-b border-slate-200 flex flex-col md:flex-row md:items-center justify-between gap-4">
-                        <div class="flex flex-col md:flex-row items-stretch md:items-center gap-3 flex-grow max-w-3xl">
-                            <!-- Search -->
-                            <div class="relative flex-grow">
-                                <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400">
-                                    <i data-lucide="search" class="w-4 h-4"></i>
-                                </span>
-                                <input type="text" id="table-search" placeholder="Cari nama barang, pemohon, atau departemen..."
-                                    class="w-full pl-9 pr-4 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all">
-                            </div>
-                            <!-- Category Filter -->
-                            <select id="filter-category" 
-                                class="px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                                <option value="ALL">Semua Kategori</option>
-                                <option value="IT Equipment">IT Equipment</option>
-                                <option value="Office Supplies">Office Supplies</option>
-                                <option value="Furniture">Furniture</option>
-                                <option value="Software">Software</option>
-                                <option value="Others">Kategori Lainnya</option>
-                            </select>
-                            <!-- Status Filter -->
-                            <select id="filter-status" 
-                                class="px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                                <option value="ALL">Semua Status</option>
-                                <option value="Pending">Menunggu</option>
-                                <option value="Approved">Disetujui</option>
-                                <option value="Rejected">Ditolak</option>
-                            </select>
-                        </div>
-
-                        <!-- Action Button -->
-                        <button id="btn-add-request" 
-                            class="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-xl shadow-lg shadow-indigo-600/10 transition-all duration-200 flex items-center justify-center gap-2">
-                            <i data-lucide="plus-circle" class="w-4.5 h-4.5"></i>
-                            <span>Buat Pengajuan Baru</span>
-                        </button>
-                    </div>
-
-                    <!-- Responsive Table Container -->
-                    <div class="overflow-x-auto custom-scroll">
-                        <table class="w-full text-left border-collapse">
-                            <thead>
-                                <tr class="bg-slate-50 border-b border-slate-200 text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                                    <th class="py-4 px-6 text-center">ID Request</th>
-                                    <th class="py-4 px-6">Informasi Pemohon</th>
-                                    <th class="py-4 px-6">Nama Barang / Kategori</th>
-                                    <th class="py-4 px-6 text-center">Jumlah / Est. Harga</th>
-                                    <th class="py-4 px-6 text-center">Tingkat Urgensi</th>
-                                    <th class="py-4 px-6 text-center">Status</th>
-                                    <th class="py-4 px-6 text-center">Aksi</th>
-                                </tr>
-                            </thead>
-                            <tbody id="request-table-body" class="divide-y divide-slate-200 text-sm">
-                                <!-- Dynamic items inject here -->
-                            </tbody>
-                        </table>
-                    </div>
-
-                    <!-- Empty State -->
-                    <div id="table-empty-state" class="hidden py-16 px-4 text-center">
-                        <div class="inline-flex p-4 bg-slate-100 text-slate-400 rounded-full mb-3">
-                            <i data-lucide="database-backup" class="w-8 h-8"></i>
-                        </div>
-                        <h3 class="text-base font-bold text-slate-800">Tidak ada pengajuan ditemukan</h3>
-                        <p class="text-xs text-slate-400 mt-1">Coba sesuaikan pencarian Anda atau tambahkan pengajuan baru.</p>
-                    </div>
-
-                    <!-- Table Footer / Stats -->
-                    <div class="p-4 bg-slate-50 border-t border-slate-200 flex items-center justify-between text-xs text-slate-500">
-                        <div>Menampilkan <span id="table-shown-count" class="font-semibold text-slate-700">0</span> dari <span id="table-total-count" class="font-semibold text-slate-700">0</span> pengajuan</div>
-                        <div class="font-medium">Data terstruktur sesuai <span class="font-bold underline text-indigo-600">E-Request_Items_FINAL.xlsx</span></div>
-                    </div>
-                </div>
-            </main>
+                <!-- FOOTER -->
+                <footer class="bg-white border-t border-slate-200 py-4 text-center text-xs text-slate-400">
+                    &copy; 2026 E-Request Items System. Menyesuaikan data file <span class="font-mono text-slate-500">E-Request_Items_FINAL.xlsx</span>.
+                </footer>
+            </div>
         </div>
 
-        <!-- NEW REQUEST MODAL -->
+        <!-- ================= MODAL: FORMULIR REQUEST BARU / EDIT ================= -->
         <div id="request-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4">
             <!-- Backdrop -->
             <div class="absolute inset-0 bg-slate-900/50 backdrop-blur-sm"></div>
@@ -315,7 +423,7 @@
                         </div>
                         <div>
                             <h3 class="font-bold text-slate-900" id="modal-title">Formulir Pengajuan Baru</h3>
-                            <p class="text-xs text-slate-400 mt-0.5">Semua data input divalidasi dan siap sinkron ke Spreadsheet</p>
+                            <p class="text-xs text-slate-400 mt-0.5">Semua kolom tervalidasi dan siap disinkronkan</p>
                         </div>
                     </div>
                     <button class="modal-close p-1.5 hover:bg-slate-100 text-slate-400 hover:text-slate-600 rounded-lg transition-all">
@@ -326,7 +434,7 @@
                 <!-- Modal Form Body -->
                 <form id="request-form">
                     <input type="hidden" id="edit-request-id">
-                    <div class="p-6 space-y-4 max-h-[70vh] overflow-y-auto custom-scroll">
+                    <div class="p-6 space-y-4 max-h-[60vh] overflow-y-auto custom-scroll">
                         <div class="grid grid-cols-2 gap-4">
                             <div>
                                 <label class="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wider">Nama Pemohon</label>
@@ -334,9 +442,18 @@
                                     class="w-full px-3 py-2 text-sm border border-slate-200 bg-slate-50 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all">
                             </div>
                             <div>
-                                <label class="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wider">Departemen</label>
-                                <input type="text" id="form-department" required placeholder="Contoh: IT Support"
+                                <label class="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wider">Cabang Kantor</label>
+                                <select id="form-branch" required
                                     class="w-full px-3 py-2 text-sm border border-slate-200 bg-slate-50 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all">
+                                    <option value="" disabled selected>Pilih Cabang</option>
+                                    <option value="Cabang Jakarta">Cabang Jakarta</option>
+                                    <option value="Cabang Bandung">Cabang Bandung</option>
+                                    <option value="Cabang Surabaya">Cabang Surabaya</option>
+                                    <option value="Cabang Medan">Cabang Medan</option>
+                                    <option value="Cabang Makassar">Cabang Makassar</option>
+                                    <option value="Cabang Semarang">Cabang Semarang</option>
+                                    <option value="Cabang Yogyakarta">Cabang Yogyakarta</option>
+                                </select>
                             </div>
                         </div>
 
@@ -348,9 +465,10 @@
 
                         <div class="grid grid-cols-2 gap-4">
                             <div>
-                                <label class="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wider">Kategori</label>
+                                <label class="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wider">Kategori Barang</label>
                                 <select id="form-category" required
                                     class="w-full px-3 py-2 text-sm border border-slate-200 bg-slate-50 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all">
+                                    <option value="" disabled selected>Pilih Kategori</option>
                                     <option value="IT Equipment">IT Equipment</option>
                                     <option value="Office Supplies">Office Supplies</option>
                                     <option value="Furniture">Furniture</option>
@@ -415,7 +533,31 @@
             </div>
         </div>
 
-        <!-- SPREADSHEET SYNC GUIDE MODAL -->
+        <!-- ================= MODAL: KONFIRMASI HAPUS DATA ================= -->
+        <div id="delete-confirm-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4">
+            <!-- Backdrop -->
+            <div class="absolute inset-0 bg-slate-900/50 backdrop-blur-sm"></div>
+            <!-- Content -->
+            <div class="relative bg-white rounded-2xl shadow-xl w-full max-w-md border border-slate-200 overflow-hidden transform transition-all">
+                <div class="p-6 text-center">
+                    <div class="inline-flex p-3 bg-rose-50 text-rose-600 rounded-full mb-4">
+                        <i data-lucide="trash-2" class="w-8 h-8"></i>
+                    </div>
+                    <h3 class="text-lg font-bold text-slate-900">Konfirmasi Hapus</h3>
+                    <p class="text-sm text-slate-500 mt-2">Apakah Anda benar-benar yakin ingin menghapus pengajuan <span id="delete-item-id-label" class="font-bold text-slate-800"></span>? Tindakan ini tidak bisa dibatalkan.</p>
+                </div>
+                <div class="p-4 bg-slate-50 border-t border-slate-100 flex items-center justify-center gap-3">
+                    <button type="button" id="btn-cancel-delete" class="flex-1 py-2 border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-sm font-semibold rounded-xl transition-all">
+                        Batalkan
+                    </button>
+                    <button type="button" id="btn-confirm-delete" class="flex-1 py-2 bg-rose-600 hover:bg-rose-700 text-white text-sm font-semibold rounded-xl transition-all shadow-md shadow-rose-600/10">
+                        Ya, Hapus Data
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ================= MODAL: PETUNJUK SPREADSHEET SINKRONISASI ================= -->
         <div id="sync-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4">
             <div class="absolute inset-0 bg-slate-900/50 backdrop-blur-sm"></div>
             <div class="relative bg-white rounded-2xl shadow-xl w-full max-w-2xl border border-slate-200 overflow-hidden transform transition-all flex flex-col max-h-[90vh]">
@@ -427,7 +569,7 @@
                         </div>
                         <div>
                             <h3 class="font-bold text-slate-900">Integrasi Realtime Google Spreadsheet</h3>
-                            <p class="text-xs text-slate-400 mt-0.5">Ubah spreadsheet Anda secara instan dari aplikasi web ini</p>
+                            <p class="text-xs text-slate-400 mt-0.5">Sinkronkan data secara realtime dari aplikasi ke file spreadsheet Anda</p>
                         </div>
                     </div>
                     <button class="modal-close p-1.5 hover:bg-slate-100 text-slate-400 hover:text-slate-600 rounded-lg transition-all">
@@ -449,7 +591,7 @@
                                 <div class="mt-2 flex flex-wrap gap-1">
                                     <span class="bg-slate-100 px-2 py-0.5 rounded text-xs text-slate-600 border border-slate-200 font-mono">ID Pengajuan</span>
                                     <span class="bg-slate-100 px-2 py-0.5 rounded text-xs text-slate-600 border border-slate-200 font-mono">Nama Pemohon</span>
-                                    <span class="bg-slate-100 px-2 py-0.5 rounded text-xs text-slate-600 border border-slate-200 font-mono">Departemen</span>
+                                    <span class="bg-slate-100 px-2 py-0.5 rounded text-xs text-slate-600 border border-slate-200 font-mono">Cabang</span>
                                     <span class="bg-slate-100 px-2 py-0.5 rounded text-xs text-slate-600 border border-slate-200 font-mono">Nama Barang</span>
                                     <span class="bg-slate-100 px-2 py-0.5 rounded text-xs text-slate-600 border border-slate-200 font-mono">Kategori</span>
                                     <span class="bg-slate-100 px-2 py-0.5 rounded text-xs text-slate-600 border border-slate-200 font-mono">Jumlah</span>
@@ -483,11 +625,11 @@ function doPost(e) {
     var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
     var data = JSON.parse(e.postData.contents);
     
-    // Pastikan susunan kolom sesuai
+    // Pastikan susunan kolom sesuai dengan Cabang
     sheet.appendRow([
       data.id,
       data.requester,
-      data.department,
+      data.branch,
       data.itemName,
       data.category,
       data.quantity,
@@ -499,7 +641,7 @@ function doPost(e) {
     
     return ContentService.createTextOutput(JSON.stringify({
       "result": "success", 
-      "message": "Data berhasil ditambahkan secara realtime ke Google Sheet!"
+      "message": "Data berhasil disinkronkan ke Google Sheet!"
     })).setMimeType(ContentService.MimeType.JSON);
   } catch(error) {
     return ContentService.createTextOutput(JSON.stringify({
@@ -518,13 +660,14 @@ function doPost(e) {
                         <div class="flex gap-3">
                             <div class="flex-shrink-0 w-6 h-6 bg-slate-100 text-slate-700 rounded-full flex items-center justify-center text-xs font-bold mt-0.5">4</div>
                             <div>
-                                <p class="font-semibold text-slate-800">Deploy sebagai Aplikasi Web</p>
+                                <p class="font-semibold text-slate-800">Deploy sebagai Aplikasi Web (PENTING!)</p>
                                 <p class="text-xs text-slate-500 mt-1">
-                                    1. Klik tombol **Deploy (Terapkan)** -> **New Deployment (Penerapan Baru)**.<br>
+                                    1. Klik tombol **Deploy (Terapkan)** di kanan atas -> **New Deployment (Penerapan Baru)**.<br>
                                     2. Pilih jenis konfigurasi sebagai **Web App (Aplikasi Web)**.<br>
-                                    3. Ubah kolom "Who has access" menjadi **Anyone (Siapa saja)**.<br>
-                                    4. Klik **Deploy** dan setujui izin akses akun Anda.<br>
-                                    5. Salin **Web App URL** yang dihasilkan.
+                                    3. Ubah kolom *"Execute as"* menjadi **Me (Email Anda)**.<br>
+                                    4. <span class="font-bold text-rose-600">PENTING:</span> Ubah kolom *"Who has access"* menjadi **Anyone (Siapa saja)**. Jika ini salah, data tidak akan bisa masuk.<br>
+                                    5. Klik **Deploy**, klik **Authorize Access**, dan setujui izin akses akun Google Anda.<br>
+                                    6. Salin **Web App URL** yang dihasilkan (pastikan link berakhiran <code class="font-mono bg-slate-100 text-slate-700 px-1">/exec</code>, bukan <code class="font-mono bg-slate-100 text-slate-700 px-1">/edit</code>).
                                 </p>
                             </div>
                         </div>
@@ -532,8 +675,8 @@ function doPost(e) {
                         <div class="flex gap-3">
                             <div class="flex-shrink-0 w-6 h-6 bg-emerald-100 text-emerald-700 rounded-full flex items-center justify-center text-xs font-bold mt-0.5">5</div>
                             <div>
-                                <p class="font-semibold text-emerald-800">Sambungkan URL di Aplikasi Web Ini</p>
-                                <p class="text-xs text-slate-500 mt-1">Masukkan URL yang telah Anda salin ke inputan di baris paling atas dashboard ini, lalu klik Simpan. Selamat, aplikasi Anda sekarang terhubung secara live ke Google Sheets!</p>
+                                <p class="font-semibold text-emerald-800">Sambungkan URL di Menu Pengaturan</p>
+                                <p class="text-xs text-slate-500 mt-1">Kembali ke tab **Pengaturan & Sync** di aplikasi ini, masukkan URL yang telah disalin, lalu klik Simpan. Aplikasi Anda sekarang terintegrasi secara live ke Google Sheets!</p>
                             </div>
                         </div>
                     </div>
@@ -548,7 +691,7 @@ function doPost(e) {
             </div>
         </div>
 
-        <!-- GITHUB GUIDE MODAL -->
+        <!-- ================= MODAL: PETUNJUK DEPLOY GITHUB PAGES ================= -->
         <div id="github-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4">
             <div class="absolute inset-0 bg-slate-900/50 backdrop-blur-sm"></div>
             <div class="relative bg-white rounded-2xl shadow-xl w-full max-w-xl border border-slate-200 overflow-hidden transform transition-all flex flex-col">
@@ -559,7 +702,7 @@ function doPost(e) {
                             <i data-lucide="github" class="w-5 h-5"></i>
                         </div>
                         <div>
-                            <h3 class="font-bold text-slate-900">Cara Upload & Online-kan di GitHub Pages</h3>
+                            <h3 class="font-bold text-slate-900">Cara Online-kan ke GitHub Pages</h3>
                             <p class="text-xs text-slate-400 mt-0.5">Gratis tanpa biaya hosting sama sekali!</p>
                         </div>
                     </div>
@@ -606,8 +749,8 @@ function doPost(e) {
                         <div class="flex gap-3">
                             <div class="flex-shrink-0 w-6 h-6 bg-emerald-100 text-emerald-700 rounded-full flex items-center justify-center text-xs font-bold mt-0.5">5</div>
                             <div>
-                                <p class="font-semibold text-emerald-800">Aplikasi Anda Online!</p>
-                                <p class="text-xs text-slate-500 mt-1">Tunggu sekitar 1-2 menit. GitHub akan menampilkan link aktif website Anda di bagian atas menu **Pages**. Bagikan link tersebut agar rekan kerja dapat menginput item secara realtime!</p>
+                                <p class="font-semibold text-emerald-800">Selesai! Aplikasi Anda Online</p>
+                                <p class="text-xs text-slate-500 mt-1">Tunggu sekitar 1-2 menit. GitHub akan menampilkan link aktif website Anda di bagian atas menu **Pages**.</p>
                             </div>
                         </div>
                     </div>
@@ -635,36 +778,38 @@ function doPost(e) {
 
     </div>
 
-    <!-- FOOTER DEVELOPMENT ATTRIBUTION -->
-    <footer class="bg-white border-t border-slate-200 py-4 text-center text-xs text-slate-400">
-        &copy; 2026 E-Request Items System. Terintegrasi secara live ke Google Sheets.
-    </footer>
-
-    <!-- LOGIC APPLICATION AND SCRIPTING -->
+    <!-- ================= SCRIPT LOGIC AND CORE ENGINE ================= -->
     <script>
-        // MOCK INITIAL DATA FROM "E-Request_Items_FINAL.xlsx"
-        // Pre-populasi data agar menyerupai Excel yang sesungguhnya saat awal load
+        // DATA AWAL SESUAI FORMAT "E-Request_Items_FINAL.xlsx" DENGAN CABANG
         const INITIAL_EXCEL_DATA = [
-            { id: "REQ-001", requester: "Ahmad Subarjo", department: "IT Infrastructure", itemName: "Monitor LG UltraFine 24 inch", category: "IT Equipment", quantity: 3, price: 3450000, urgency: "High", status: "Approved", date: "2026-07-01" },
-            { id: "REQ-002", requester: "Siti Rahmawati", department: "Human Resources", itemName: "Kursi Ergonomis Office Plus", category: "Furniture", quantity: 5, price: 1850000, urgency: "Medium", status: "Pending", date: "2026-07-03" },
-            { id: "REQ-003", requester: "Rian Hidayat", department: "Finance", itemName: "Lisensi Adobe Acrobat Pro PDF", category: "Software", quantity: 1, price: 2900000, urgency: "Low", status: "Pending", date: "2026-07-04" },
-            { id: "REQ-004", requester: "Dewi Lestari", department: "General Affairs", itemName: "Kertas A4 PaperOne 80gr", category: "Office Supplies", quantity: 15, price: 55000, urgency: "Medium", status: "Approved", date: "2026-07-05" },
-            { id: "REQ-005", requester: "Bambang Wijaya", department: "Marketing", itemName: "Kamera Mirrorless Sony Alpha A6400", category: "IT Equipment", quantity: 1, price: 14500000, urgency: "High", status: "Rejected", date: "2026-07-06" }
+            { id: "REQ-001", requester: "Ahmad Subarjo", branch: "Cabang Jakarta", itemName: "Monitor LG UltraFine 24 inch", category: "IT Equipment", quantity: 3, price: 3450000, urgency: "High", status: "Approved", date: "2026-07-01" },
+            { id: "REQ-002", requester: "Siti Rahmawati", branch: "Cabang Bandung", itemName: "Kursi Ergonomis Office Plus", category: "Furniture", quantity: 5, price: 1850000, urgency: "Medium", status: "Pending", date: "2026-07-03" },
+            { id: "REQ-003", requester: "Rian Hidayat", branch: "Cabang Surabaya", itemName: "Lisensi Adobe Acrobat Pro PDF", category: "Software", quantity: 1, price: 2900000, urgency: "Low", status: "Pending", date: "2026-07-04" },
+            { id: "REQ-004", requester: "Dewi Lestari", branch: "Cabang Jakarta", itemName: "Kertas A4 PaperOne 80gr", category: "Office Supplies", quantity: 15, price: 55000, urgency: "Medium", status: "Approved", date: "2026-07-05" },
+            { id: "REQ-005", requester: "Bambang Wijaya", branch: "Cabang Medan", itemName: "Kamera Mirrorless Sony Alpha A6400", category: "IT Equipment", quantity: 1, price: 14500000, urgency: "High", status: "Rejected", date: "2026-07-06" }
         ];
 
-        // Core State
+        // Core App State
         const state = {
             isLoggedIn: false,
             requests: [],
             sheetsUrl: localStorage.getItem("erequest_sheets_url") || "",
+            activeTab: "dashboard-tab",
+            activeFilterBranch: "ALL",
             activeFilterCategory: "ALL",
             activeFilterStatus: "ALL",
-            searchQuery: ""
+            searchQuery: "",
+            pendingDeleteId: null,
+            charts: {
+                urgency: null,
+                branch: null,
+                category: null
+            }
         };
 
         // Initialize App
         window.addEventListener("DOMContentLoaded", () => {
-            // Load saved requests from localStorage or use initial excel data
+            // Load saved requests or use default Excel mockup
             const savedRequests = localStorage.getItem("erequest_data");
             if (savedRequests) {
                 state.requests = JSON.parse(savedRequests);
@@ -673,29 +818,62 @@ function doPost(e) {
                 saveToLocalStorage();
             }
 
-            // Sync Web App URL on initialization
+            // Sync Web App URL input
             if (state.sheetsUrl) {
-                document.getElementById("spreadsheet-url-input").value = state.sheetsUrl;
+                const urlInput = document.getElementById("spreadsheet-url-input");
+                if (urlInput) urlInput.value = state.sheetsUrl;
+                validateUrlFormat(state.sheetsUrl);
+                updateConnectionBadge(true);
+            } else {
+                updateConnectionBadge(false);
             }
 
-            // Initialize Lucide Icons
+            // Initialize Icons
             lucide.createIcons();
 
-            // Setup all event listeners
+            // Setup event listeners
             initEventListeners();
             
-            // Check active session (optional, for simple persist login)
+            // Check session
             if (sessionStorage.getItem("erequest_session") === "active") {
                 loginSuccess();
             }
         });
 
-        // Save database state locally
+        // Save DB Locally
         function saveToLocalStorage() {
             localStorage.setItem("erequest_data", JSON.stringify(state.requests));
         }
 
-        // Trigger notifications to UI
+        // Helper URL validation format
+        function validateUrlFormat(url) {
+            const warningBox = document.getElementById("url-validation-warning");
+            if (!url) {
+                warningBox.classList.add("hidden");
+                return true;
+            }
+            if (url.includes("/edit") || !url.includes("/exec")) {
+                warningBox.classList.remove("hidden");
+                return false;
+            } else {
+                warningBox.classList.add("hidden");
+                return true;
+            }
+        }
+
+        // Sync connection badge status UI
+        function updateConnectionBadge(isConnected) {
+            const badge = document.getElementById("quick-status-badge");
+            if (isConnected) {
+                badge.className = "inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-100";
+                badge.innerHTML = `<span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span> Terkoneksi (Sheets)`;
+            } else {
+                badge.className = "inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-amber-50 text-amber-700 border border-amber-100";
+                badge.innerHTML = `<span class="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span> Mode Lokal`;
+            }
+        }
+
+        // Trigger Toast notifications to UI
         function showNotification(title, text, type = "success") {
             const toast = document.getElementById("toast");
             const toastText = document.getElementById("toast-text");
@@ -706,7 +884,6 @@ function doPost(e) {
             toastText.textContent = title;
             toastSub.textContent = text;
 
-            // Handle styles based on alert status
             if (type === "success") {
                 toastIconBg.className = "p-1.5 bg-emerald-600 rounded-lg";
                 toastIcon.setAttribute("data-lucide", "check");
@@ -725,7 +902,6 @@ function doPost(e) {
                 toast.classList.remove("translate-y-20");
             }, 50);
 
-            // Hide Toast Auto
             setTimeout(() => {
                 toast.classList.add("translate-y-20");
                 setTimeout(() => {
@@ -734,7 +910,7 @@ function doPost(e) {
             }, 4000);
         }
 
-        // Format Currency Helper
+        // Format IDR Rupiah Currency Helper
         function formatRupiah(value) {
             return new Intl.NumberFormat('id-ID', {
                 style: 'currency',
@@ -743,15 +919,60 @@ function doPost(e) {
             }).format(value);
         }
 
-        // Initialize Actions & Buttons Click Events
+        // ================= NAVIGATION TAB CONTROLLERS =================
+        function switchTab(tabId) {
+            // Hide all tabs
+            const tabs = document.querySelectorAll(".tab-content");
+            tabs.forEach(tab => tab.classList.add("hidden"));
+
+            // Show selected tab
+            document.getElementById(tabId).classList.remove("hidden");
+
+            // Update state & Active styling sidebar menu
+            state.activeTab = tabId;
+            
+            // Remove active classes
+            document.getElementById("nav-dashboard-tab").classList.remove("sidebar-active");
+            document.getElementById("nav-requests-tab").classList.remove("sidebar-active");
+            document.getElementById("nav-settings-tab").classList.remove("sidebar-active");
+
+            // Define Header Title dynamically
+            let headerTitle = "Ringkasan Dashboard";
+            if (tabId === "dashboard-tab") {
+                document.getElementById("nav-dashboard-tab").classList.add("sidebar-active");
+                headerTitle = "Ringkasan Dashboard";
+                renderCharts(); // Re-render charts
+            } else if (tabId === "requests-tab") {
+                document.getElementById("nav-requests-tab").classList.add("sidebar-active");
+                headerTitle = "Daftar Pengajuan Barang";
+            } else if (tabId === "settings-tab") {
+                document.getElementById("nav-settings-tab").classList.add("sidebar-active");
+                headerTitle = "Pengaturan & Sinkronisasi";
+            }
+
+            document.getElementById("header-page-title").textContent = headerTitle;
+        }
+
+        // ================= INITIALIZE ACTION EVENTS =================
         function initEventListeners() {
-            // Form Login
+            // Mobile Sidebar Toggler
+            const sidebar = document.querySelector("aside");
+            document.getElementById("sidebar-open-mobile").addEventListener("click", () => {
+                sidebar.classList.remove("-translate-x-full");
+                sidebar.classList.add("fixed", "inset-y-0", "left-0", "z-50", "translate-x-0");
+            });
+
+            document.getElementById("sidebar-close-mobile").addEventListener("click", () => {
+                sidebar.classList.add("-translate-x-full");
+                sidebar.classList.remove("fixed", "inset-y-0", "left-0", "z-50", "translate-x-0");
+            });
+
+            // Login submit form listener
             document.getElementById("login-form").addEventListener("submit", (e) => {
                 e.preventDefault();
                 const user = document.getElementById("username").value.trim();
                 const pass = document.getElementById("password").value;
 
-                // Simple credential verification (can use dynamic logic)
                 if (user === "admin" && pass === "admin123") {
                     loginSuccess();
                 } else {
@@ -761,7 +982,7 @@ function doPost(e) {
                 }
             });
 
-            // Toggle Password View visibility
+            // Toggle Password Eye visibility
             document.getElementById("toggle-password").addEventListener("click", () => {
                 const passInput = document.getElementById("password");
                 const passIcon = document.getElementById("password-icon");
@@ -775,31 +996,45 @@ function doPost(e) {
                 lucide.createIcons();
             });
 
-            // Save Spreadsheet URL
+            // Save Web App URL
             document.getElementById("btn-save-sheets-url").addEventListener("click", () => {
                 const urlInput = document.getElementById("spreadsheet-url-input").value.trim();
                 state.sheetsUrl = urlInput;
                 localStorage.setItem("erequest_sheets_url", urlInput);
                 
+                const isValid = validateUrlFormat(urlInput);
+                
                 if (urlInput) {
-                    showNotification("Spreadsheet Terkoneksi!", "Integrasi realtime telah siap dijalankan.", "success");
+                    if (isValid) {
+                        updateConnectionBadge(true);
+                        showNotification("Koneksi Ditambahkan!", "Integrasi realtime Google Spreadsheet aktif.", "success");
+                    } else {
+                        updateConnectionBadge(false);
+                        showNotification("Peringatan Link!", "Tampaknya format URL yang Anda masukkan salah.", "error");
+                    }
                 } else {
-                    showNotification("Koneksi Dinonaktifkan", "Penyimpanan kembali menggunakan memori lokal.", "info");
+                    updateConnectionBadge(false);
+                    showNotification("Koneksi Dinonaktifkan", "Aplikasi beralih kembali menggunakan penyimpanan lokal.", "info");
                 }
             });
 
-            // Logout Action
+            // Log Out action button
             document.getElementById("btn-logout").addEventListener("click", () => {
                 sessionStorage.removeItem("erequest_session");
                 state.isLoggedIn = false;
-                document.getElementById("dashboard-section").classList.add("hidden");
+                document.getElementById("main-panel").classList.add("hidden");
                 document.getElementById("login-section").classList.remove("hidden");
-                showNotification("Berhasil Logout", "Sesi akses Anda telah diakhiri.", "info");
+                showNotification("Berhasil Logout", "Sesi login Anda telah diakhiri.", "info");
             });
 
-            // Table Filters and Search
+            // Search Filter controls
             document.getElementById("table-search").addEventListener("input", (e) => {
                 state.searchQuery = e.target.value.toLowerCase();
+                renderTable();
+            });
+
+            document.getElementById("filter-branch").addEventListener("change", (e) => {
+                state.activeFilterBranch = e.target.value;
                 renderTable();
             });
 
@@ -813,21 +1048,19 @@ function doPost(e) {
                 renderTable();
             });
 
-            // Handle Modals Trigger
+            // Add Request button handler
             document.getElementById("btn-add-request").addEventListener("click", () => {
                 openRequestModal();
             });
 
-            // Guide Buttons
+            // Modal guides open trigger listeners
             const showSyncModals = () => document.getElementById("sync-modal").classList.remove("hidden");
             const showGithubModals = () => document.getElementById("github-modal").classList.remove("hidden");
 
             document.getElementById("btn-show-sync-guide").addEventListener("click", showSyncModals);
-            document.getElementById("btn-show-sync-guide-mobile").addEventListener("click", showSyncModals);
             document.getElementById("btn-show-github-guide").addEventListener("click", showGithubModals);
-            document.getElementById("btn-show-github-guide-mobile").addEventListener("click", showGithubModals);
 
-            // Close all Modals
+            // Modal dismiss/closes callback
             const modalCloses = document.querySelectorAll(".modal-close");
             modalCloses.forEach(btn => {
                 btn.addEventListener("click", () => {
@@ -837,78 +1070,189 @@ function doPost(e) {
                 });
             });
 
-            // Copy Apps Script Clipboard Action
+            // Custom modal delete controls callbacks
+            document.getElementById("btn-cancel-delete").addEventListener("click", () => {
+                document.getElementById("delete-confirm-modal").classList.add("hidden");
+                state.pendingDeleteId = null;
+            });
+
+            document.getElementById("btn-confirm-delete").addEventListener("click", () => {
+                if (state.pendingDeleteId) {
+                    confirmDeleteRequest(state.pendingDeleteId);
+                }
+            });
+
+            // Copy script button callback
             document.getElementById("btn-copy-script").addEventListener("click", () => {
                 const copyText = document.getElementById("apps-script-code");
                 copyText.select();
-                copyText.setSelectionRange(0, 99999); // For mobile devices
+                copyText.setSelectionRange(0, 99999);
                 document.execCommand("copy");
-                
-                showNotification("Disalin!", "Script telah disalin ke clipboard.", "success");
+                showNotification("Salin Kode!", "Apps Script berhasil dicopy ke clipboard.", "success");
             });
 
-            // Request Form Submit
+            // Request submit handler
             document.getElementById("request-form").addEventListener("submit", (e) => {
                 e.preventDefault();
                 submitRequestForm();
             });
         }
 
-        // Handle Session Gates
+        // ================= CORE MODULES ENGINE AND HANDLERS =================
         function loginSuccess() {
             sessionStorage.setItem("erequest_session", "active");
             state.isLoggedIn = true;
             document.getElementById("login-section").classList.add("hidden");
-            document.getElementById("dashboard-section").classList.remove("hidden");
+            document.getElementById("main-panel").classList.remove("hidden");
             
-            // Clear inputs
+            // Clear passwords security
             document.getElementById("username").value = "";
             document.getElementById("password").value = "";
 
+            switchTab("dashboard-tab");
             renderDashboard();
-            showNotification("Akses Diterima", "Selamat datang kembali di E-Request System!", "success");
+            showNotification("Sesi Aktif", "Selamat datang di E-Request Management System!", "success");
         }
 
-        // Render Dashboard Overview & KPIs
         function renderDashboard() {
             const requests = state.requests;
             
-            // Calculate status elements
             const total = requests.length;
             const pending = requests.filter(r => r.status === "Pending").length;
             const approved = requests.filter(r => r.status === "Approved").length;
             const rejected = requests.filter(r => r.status === "Rejected").length;
 
-            // Render stats animation counts
             document.getElementById("kpi-total").textContent = total;
             document.getElementById("kpi-pending").textContent = pending;
             document.getElementById("kpi-approved").textContent = approved;
             document.getElementById("kpi-rejected").textContent = rejected;
 
             renderTable();
+            renderCharts();
         }
 
-        // Dynamic Filtering and Table Render Engine
+        // ================= CHART RENDERING MECHANISM (Chart.js) =================
+        function renderCharts() {
+            if (state.activeTab !== "dashboard-tab") return;
+
+            // Destroy previous charts to avoid canvas overlaps
+            if (state.charts.urgency) state.charts.urgency.destroy();
+            if (state.charts.branch) state.charts.branch.destroy();
+            if (state.charts.category) state.charts.category.destroy();
+
+            const data = state.requests;
+
+            // 1. URGENCY DATA BREAKDOWN
+            const highCount = data.filter(r => r.urgency === "High").length;
+            const mediumCount = data.filter(r => r.urgency === "Medium").length;
+            const lowCount = data.filter(r => r.urgency === "Low").length;
+
+            const ctxUrgency = document.getElementById("urgencyChart").getContext("2d");
+            state.charts.urgency = new Chart(ctxUrgency, {
+                type: 'doughnut',
+                data: {
+                    labels: ['High', 'Medium', 'Low'],
+                    datasets: [{
+                        data: [highCount, mediumCount, lowCount],
+                        backgroundColor: ['#f43f5e', '#f59e0b', '#3b82f6'],
+                        borderWidth: 2,
+                        hoverOffset: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } }
+                    }
+                }
+            });
+
+            // 2. BRANCH DATA BREAKDOWN
+            const branches = [
+                "Cabang Jakarta", "Cabang Bandung", "Cabang Surabaya", 
+                "Cabang Medan", "Cabang Makassar", "Cabang Semarang", "Cabang Yogyakarta"
+            ];
+            const branchCounts = branches.map(br => data.filter(r => r.branch === br).length);
+
+            const ctxBranch = document.getElementById("branchChart").getContext("2d");
+            state.charts.branch = new Chart(ctxBranch, {
+                type: 'bar',
+                data: {
+                    labels: branches.map(b => b.replace("Cabang ", "")),
+                    datasets: [{
+                        label: 'Jumlah Pengajuan',
+                        data: branchCounts,
+                        backgroundColor: '#6366f1',
+                        borderRadius: 6,
+                        maxBarThickness: 28
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        y: { beginAtZero: true, ticks: { precision: 0 } },
+                        x: { grid: { display: false } }
+                    }
+                }
+            });
+
+            // 3. CATEGORY DATA BREAKDOWN
+            const categories = ["IT Equipment", "Office Supplies", "Furniture", "Software", "Others"];
+            const catCounts = categories.map(cat => data.filter(r => r.category === cat).length);
+
+            const ctxCategory = document.getElementById("categoryChart").getContext("2d");
+            state.charts.category = new Chart(ctxCategory, {
+                type: 'bar',
+                data: {
+                    labels: categories,
+                    datasets: [{
+                        label: 'Alokasi Pengajuan',
+                        data: catCounts,
+                        backgroundColor: [
+                            '#818cf8', '#34d399', '#fca5a5', '#60a5fa', '#94a3b8'
+                        ],
+                        borderRadius: 6,
+                        maxBarThickness: 35
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        y: { beginAtZero: true, ticks: { precision: 0 } },
+                        x: { grid: { display: false } }
+                    }
+                }
+            });
+        }
+
+        // ================= TABLE RENDER ENGINE =================
         function renderTable() {
             const tableBody = document.getElementById("request-table-body");
             const emptyState = document.getElementById("table-empty-state");
+            if (!tableBody) return;
+
             tableBody.innerHTML = "";
 
-            // Filter requests array based on current constraints
             const filtered = state.requests.filter(item => {
                 const matchesSearch = 
                     item.itemName.toLowerCase().includes(state.searchQuery) ||
                     item.requester.toLowerCase().includes(state.searchQuery) ||
-                    item.department.toLowerCase().includes(state.searchQuery) ||
+                    (item.branch && item.branch.toLowerCase().includes(state.searchQuery)) ||
                     item.id.toLowerCase().includes(state.searchQuery);
 
+                const matchesBranch = state.activeFilterBranch === "ALL" || item.branch === state.activeFilterBranch;
                 const matchesCategory = state.activeFilterCategory === "ALL" || item.category === state.activeFilterCategory;
                 const matchesStatus = state.activeFilterStatus === "ALL" || item.status === state.activeFilterStatus;
 
-                return matchesSearch && matchesCategory && matchesStatus;
+                return matchesSearch && matchesBranch && matchesCategory && matchesStatus;
             });
 
-            // Sort by latest Date / ID
+            // Sort by ID latest
             filtered.sort((a, b) => b.id.localeCompare(a.id));
 
             if (filtered.length === 0) {
@@ -920,14 +1264,14 @@ function doPost(e) {
                     const tr = document.createElement("tr");
                     tr.className = "hover:bg-slate-50 transition-all duration-150 border-b border-slate-100";
 
-                    // Define Badge Elements
+                    // Badges indicators
                     let urgencyBadge = "";
                     if (item.urgency === "High") {
-                        urgencyBadge = `<span class="inline-flex px-2 py-1 text-[10px] font-bold bg-rose-50 text-rose-700 rounded-md border border-rose-100">HIGH</span>`;
+                        urgencyBadge = `<span class="inline-flex px-2.5 py-1 text-[10px] font-bold bg-rose-50 text-rose-700 rounded-md border border-rose-100">HIGH</span>`;
                     } else if (item.urgency === "Medium") {
-                        urgencyBadge = `<span class="inline-flex px-2 py-1 text-[10px] font-bold bg-amber-50 text-amber-700 rounded-md border border-amber-100">MEDIUM</span>`;
+                        urgencyBadge = `<span class="inline-flex px-2.5 py-1 text-[10px] font-bold bg-amber-50 text-amber-700 rounded-md border border-amber-100">MEDIUM</span>`;
                     } else {
-                        urgencyBadge = `<span class="inline-flex px-2 py-1 text-[10px] font-bold bg-blue-50 text-blue-700 rounded-md border border-blue-100">LOW</span>`;
+                        urgencyBadge = `<span class="inline-flex px-2.5 py-1 text-[10px] font-bold bg-blue-50 text-blue-700 rounded-md border border-blue-100">LOW</span>`;
                     }
 
                     let statusBadge = "";
@@ -943,7 +1287,10 @@ function doPost(e) {
                         <td class="py-4 px-6 text-center font-mono font-bold text-slate-500">${item.id}</td>
                         <td class="py-4 px-6">
                             <div class="font-bold text-slate-800">${item.requester}</div>
-                            <div class="text-xs text-slate-400 mt-0.5">${item.department}</div>
+                            <div class="text-xs text-indigo-600 mt-0.5 font-medium flex items-center gap-1">
+                                <i data-lucide="map-pin" class="w-3.5 h-3.5"></i>
+                                ${item.branch || "-"}
+                            </div>
                         </td>
                         <td class="py-4 px-6">
                             <div class="font-semibold text-slate-800">${item.itemName}</div>
@@ -970,30 +1317,27 @@ function doPost(e) {
                 });
             }
 
-            // Sync Footer Counts & Icons
             document.getElementById("table-shown-count").textContent = filtered.length;
             document.getElementById("table-total-count").textContent = state.requests.length;
             lucide.createIcons();
         }
 
-        // Form Modals Setup Helper
+        // ================= MODAL FORM CONTROL UTILS =================
         function openRequestModal(existingItem = null) {
             const form = document.getElementById("request-form");
             form.reset();
 
             if (existingItem) {
-                // Edit Mode
                 document.getElementById("modal-title").textContent = "Ubah Detail Pengajuan";
                 document.getElementById("edit-request-id").value = existingItem.id;
                 document.getElementById("form-requester").value = existingItem.requester;
-                document.getElementById("form-department").value = existingItem.department;
+                document.getElementById("form-branch").value = existingItem.branch || "";
                 document.getElementById("form-item-name").value = existingItem.itemName;
                 document.getElementById("form-category").value = existingItem.category;
                 document.getElementById("form-urgency").value = existingItem.urgency;
                 document.getElementById("form-quantity").value = existingItem.quantity;
                 document.getElementById("form-price").value = existingItem.price;
                 
-                // Select proper Radio button for status
                 const radios = document.getElementsByName("form-status");
                 radios.forEach(radio => {
                     if (radio.value === existingItem.status) radio.checked = true;
@@ -1001,21 +1345,20 @@ function doPost(e) {
 
                 document.getElementById("form-admin-only").classList.remove("hidden");
             } else {
-                // Create Mode
                 document.getElementById("modal-title").textContent = "Formulir Pengajuan Baru";
                 document.getElementById("edit-request-id").value = "";
-                document.getElementById("form-admin-only").classList.add("hidden"); // users default state to pending
+                document.getElementById("form-admin-only").classList.add("hidden");
             }
 
             document.getElementById("request-modal").classList.remove("hidden");
         }
 
-        // Save / Edit Submissions Handlers
+        // ================= SUBMIT FORM CONTROLLER (LOCALSTORAGE & GOOGLE SHEETS) =================
         async function submitRequestForm() {
             const editId = document.getElementById("edit-request-id").value;
             
             const requester = document.getElementById("form-requester").value.trim();
-            const department = document.getElementById("form-department").value.trim();
+            const branch = document.getElementById("form-branch").value;
             const itemName = document.getElementById("form-item-name").value.trim();
             const category = document.getElementById("form-category").value;
             const urgency = document.getElementById("form-urgency").value;
@@ -1033,19 +1376,18 @@ function doPost(e) {
             const today = new Date().toISOString().split('T')[0];
 
             if (editId) {
-                // EDIT EXISTING REQUEST
+                // EDIT PROCESS
                 const index = state.requests.findIndex(r => r.id === editId);
                 if (index !== -1) {
                     state.requests[index] = {
                         ...state.requests[index],
-                        requester, department, itemName, category, urgency, quantity, price, status
+                        requester, branch, itemName, category, urgency, quantity, price, status
                     };
                     saveToLocalStorage();
-                    showNotification("Berhasil Diupdate", `Pengajuan ${editId} berhasil diubah.`, "success");
+                    showNotification("Berhasil Diupdate", `Pengajuan ${editId} berhasil diperbarui.`, "success");
                 }
             } else {
-                // CREATE NEW REQUEST
-                // Generate secure auto ID
+                // ADD PROCESS
                 const nextIdNum = state.requests.length > 0 
                     ? Math.max(...state.requests.map(r => parseInt(r.id.split('-')[1]))) + 1 
                     : 1;
@@ -1054,7 +1396,7 @@ function doPost(e) {
                 const newRequest = {
                     id: nextId,
                     requester,
-                    department,
+                    branch,
                     itemName,
                     category,
                     quantity,
@@ -1067,33 +1409,31 @@ function doPost(e) {
                 state.requests.push(newRequest);
                 saveToLocalStorage();
 
-                // REALTIME SPREADSHEET TRANSFERS & CONNECTION (If configured)
+                // REALTIME GOOGLE SHEETS API SYNCING
                 if (state.sheetsUrl) {
                     showNotification("Mengirim Data...", "Sedang menyinkronkan data dengan Google Spreadsheet...", "info");
                     
                     try {
-                        // We use direct POST with no-cors or JSON payload depending on implementation.
-                        // Standard Google Apps Script responds beautifully with standard fetch configurations.
                         const response = await fetch(state.sheetsUrl, {
                             method: "POST",
-                            mode: "no-cors", // Crucial block for cors bypass inside generic web apps
+                            mode: "no-cors", 
                             headers: {
-                                "Content-Type": "application/json",
+                                "Content-Type": "text/plain;charset=utf-8",
                             },
                             body: JSON.stringify(newRequest)
                         });
                         
-                        showNotification("Tersinkronisasi!", `Data baru berhasil ditambahkan secara realtime ke Google Sheet Anda!`, "success");
+                        showNotification("Tersinkronisasi!", `Data baru ${nextId} berhasil terkirim ke Google Sheets!`, "success");
                     } catch (error) {
-                        console.error("Spreadsheet sync failed:", error);
-                        showNotification("Gagal Sinkron", "Periksa koneksi atau validasi URL Apps Script Anda.", "error");
+                        console.error("Sheets sync failed:", error);
+                        showNotification("Koneksi Gagal", "Gagal mengirim data ke Sheets, data tetap aman tersimpan secara lokal.", "error");
                     }
                 } else {
-                    showNotification("Berhasil Dibuat", `Data baru tersimpan di browser Anda dengan ID ${nextId}.`, "success");
+                    showNotification("Berhasil Disimpan", `Data baru tersimpan secara lokal dengan ID ${nextId}.`, "success");
                 }
             }
 
-            // Close modal and redraw
+            // Clean UI Close and redraw
             document.getElementById("request-modal").classList.add("hidden");
             renderDashboard();
         }
@@ -1106,16 +1446,23 @@ function doPost(e) {
             }
         }
 
-        // Action Trigger for Deleting single item
+        // Action Trigger for Deleting single item (Buka Modal Kustom)
         function deleteRequest(id) {
-            // Standard elegant confirm bypass inside Canvas Web UI
-            const confirmDelete = confirm(`Apakah Anda yakin ingin menghapus data pengajuan ${id}?`);
-            if (confirmDelete) {
-                state.requests = state.requests.filter(r => r.id !== id);
-                saveToLocalStorage();
-                renderDashboard();
-                showNotification("Berhasil Dihapus", `Pengajuan ${id} berhasil dihapus dari database.`, "info");
-            }
+            state.pendingDeleteId = id;
+            document.getElementById("delete-item-id-label").textContent = id;
+            document.getElementById("delete-confirm-modal").classList.remove("hidden");
+        }
+
+        // Eksekusi hapus setelah dikonfirmasi di modal kustom
+        function confirmDeleteRequest(id) {
+            state.requests = state.requests.filter(r => r.id !== id);
+            saveToLocalStorage();
+            renderDashboard();
+            
+            document.getElementById("delete-confirm-modal").classList.add("hidden");
+            state.pendingDeleteId = null;
+            
+            showNotification("Berhasil Dihapus", `Pengajuan ${id} telah dihapus.`, "info");
         }
     </script>
 </body>
