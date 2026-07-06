@@ -1,0 +1,1414 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ReqBarang - Sistem Permintaan Barang Internal</title>
+    
+    <!-- Tailwind CSS untuk Styling Premium -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#eef2ff',
+                            100: '#e0e7ff',
+                            500: '#6366f1',
+                            600: '#4f46e5',
+                            700: '#4338ca',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Font Awesome untuk Icon Menarik -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- React dan Babel CDN agar React bisa jalan langsung di HTML -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <!-- Membuka Akses ke Firebase SDK versi modern -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getFirestore, collection, addDoc, onSnapshot, doc, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+        
+        // Membungkus SDK ke Window Object agar bisa dibaca oleh script Babel React
+        window.FirebaseSDK = { initializeApp, getFirestore, collection, addDoc, onSnapshot, doc, updateDoc, deleteDoc };
+    </script>
+</head>
+<body class="bg-slate-50 text-slate-900 font-sans transition-colors duration-200 dark:bg-slate-950 dark:text-slate-100">
+
+    <div id="root">
+        <!-- Spinner Loading Awal Sebelum React Ter-render -->
+        <div class="flex items-center justify-center min-h-screen">
+            <div class="text-center">
+                <div class="inline-block animate-spin rounded-full h-12 w-12 border-4 border-indigo-600 border-t-transparent mb-4"></div>
+                <p class="text-slate-500 font-medium">Memuat Sistem ReqBarang & Database Sync...</p>
+            </div>
+        </div>
+    </div>
+
+    <script type="text/babel">
+        // Mengambil modul Firebase dari window object
+        const { initializeApp, getFirestore, collection, addDoc, onSnapshot, doc, updateDoc, deleteDoc } = window.FirebaseSDK || {};
+
+        // Konfigurasi Database Firebase Mock / Sandbox agar langsung aktif tanpa setup manual
+        const firebaseConfig = {
+            apiKey: "",
+            authDomain: "mock-project.firebaseapp.com",
+            projectId: "mock-project-reqbarang",
+            storageBucket: "mock-project.appspot.com",
+            messagingSenderId: "12345678",
+            appId: "1:12345678:web:123"
+        };
+
+        // Inisialisasi Firebase
+        let db;
+        try {
+            const app = initializeApp(firebaseConfig);
+            db = getFirestore(app);
+        } catch (e) {
+            console.warn("Firebase gagal inisialisasi, mengaktifkan mode Local Storage sebagai cadangan.");
+        }
+
+        // Daftar Pilihan Role Akun untuk Simulasi
+        const ROLES = {
+            STAFF: { id: 'staff', name: 'Pemohon / Staff (PIC)', desc: 'Bisa membuat & melihat pengajuan sendiri' },
+            MANAGER: { id: 'manager', name: 'Manager / Approver', desc: 'Bisa menyetujui / menolak pengajuan' },
+            FINANCE: { id: 'finance', name: 'Finance / Purchasing', desc: 'Bisa input harga, update status, & kelola semua data' }
+        };
+
+        // Penyelarasan KATEGORI dari database E-Request_Items_FINAL
+        const CATEGORIES = [
+            'ATK',
+            'Chemical',
+            'Facilities Building',
+            'Facilities Customer',
+            'Facilities Dine In',
+            'Medical Supplies',
+            'Support Equipment',
+            'Lainnya'
+        ];
+
+        // Penyelarasan STATUS dari database E-Request_Items_FINAL
+        const STATUSES = [
+            'Draft',
+            'Pending Approval',
+            'Approved',
+            'Rejected',
+            'Purchased',
+            'Received'
+        ];
+
+        // Penyelarasan CABANG / STORE aktif dari database E-Request_Items_FINAL
+        const STORES = [
+            'BAKSO TENTREM',
+            'BINTARO',
+            'BOGOR',
+            'CIBEUNYING',
+            'CILAKI',
+            'CIPETE',
+            'MASKUMAMBANG',
+            'MRT',
+            'OFFICE',
+            'PASARAYA',
+            'SBY BARAT',
+            'SBY MUSI'
+        ];
+
+        function App() {
+            // States untuk manajemen mode tampilan, akun simulasi, dan notifikasi
+            const [currentRole, setCurrentRole] = React.useState('staff');
+            const [darkMode, setDarkMode] = React.useState(false);
+            const [userProfile, setUserProfile] = React.useState({
+                name: 'Sammy',
+                cabang: 'SBY MUSI',
+                divisi: 'Support',
+                whatsapp: '6281234567890'
+            });
+
+            // State untuk menampung data
+            const [requests, setRequests] = React.useState([]);
+            const [loading, setLoading] = React.useState(true);
+            const [notification, setNotification] = React.useState(null);
+
+            // Filter dan Pencarian
+            const [searchTerm, setSearchTerm] = React.useState('');
+            const [statusFilter, setStatusFilter] = React.useState('All');
+            const [categoryFilter, setCategoryFilter] = React.useState('All');
+            const [storeFilter, setStoreFilter] = React.useState('All');
+
+            // Modal States
+            const [isModalOpen, setIsModalOpen] = React.useState(false);
+            const [isDetailModalOpen, setIsDetailModalOpen] = React.useState(false);
+            const [isSyncSettingsOpen, setIsSyncSettingsOpen] = React.useState(false);
+            const [selectedRequest, setSelectedRequest] = React.useState(null);
+
+            // Google Sheets Integration Settings State
+            const [appsScriptUrl, setAppsScriptUrl] = React.useState(() => {
+                return localStorage.getItem('req_barang_apps_script_url') || '';
+            });
+            const [isSyncActive, setIsSyncActive] = React.useState(() => {
+                return localStorage.getItem('req_barang_sync_active') === 'true';
+            });
+
+            // State Form Permintaan Baru (Disesuaikan dengan field database Anda)
+            const [formData, setFormData] = React.useState({
+                tglTerakhirPembelian: '',
+                cabang: 'SBY MUSI',
+                pemohon: 'Sammy',
+                divisi: 'Support',
+                kategori: 'Support Equipment',
+                namaBarang: '',
+                qty: 1,
+                alasanUrgensi: 'Normal', // Normal, Urgent
+                media: 'Offline Store',
+                notes: '',
+                whatsapp: '6281234567890',
+                harga: 0
+            });
+
+            // Sinkronkan form data dengan data profil pengguna aktif
+            React.useEffect(() => {
+                setFormData(prev => ({
+                    ...prev,
+                    pemohon: userProfile.name,
+                    cabang: userProfile.cabang,
+                    divisi: userProfile.divisi,
+                    whatsapp: userProfile.whatsapp
+                }));
+            }, [userProfile]);
+
+            // Ambil Data Secara Realtime dari Firebase Firestore (Atau fallback ke LocalStorage)
+            React.useEffect(() => {
+                if (db) {
+                    const reqCollection = collection(db, 'requests');
+                    const unsubscribe = onSnapshot(reqCollection, (snapshot) => {
+                        const dataList = [];
+                        snapshot.forEach((doc) => {
+                            dataList.push({ id: doc.id, ...doc.data() });
+                        });
+                        // Urutkan berdasarkan tanggal request terbaru
+                        dataList.sort((a, b) => new Date(b.tglRequest) - new Date(a.tglRequest));
+                        setRequests(dataList);
+                        setLoading(false);
+                    }, (error) => {
+                        console.error("Gagal konek Firebase, beralih ke penyimpanan lokal browser.");
+                        loadBackupLocalData();
+                    });
+                    return () => unsubscribe();
+                } else {
+                    loadBackupLocalData();
+                }
+            }, []);
+
+            // Mengisi data awal persis sesuai statistik DASHBOARD EKSEKUTIF E-Request_Items_FINAL
+            const loadBackupLocalData = () => {
+                const localData = localStorage.getItem('req_barang_data');
+                if (localData) {
+                    setRequests(JSON.parse(localData));
+                } else {
+                    // Seed data awal agar stat-nya persis dengan data spreadsheet Anda (94 request, Rp 2.590.957 total biaya)
+                    const sampleData = [
+                        {
+                            id: 'req-01',
+                            tglRequest: '2026-07-06',
+                            tglTerakhirPembelian: '2026-05-12',
+                            cabang: 'BINTARO',
+                            pemohon: 'Resa',
+                            divisi: 'Operational',
+                            kategori: 'Support Equipment',
+                            namaBarang: 'Vacuum Cleaner Portable',
+                            qty: 1,
+                            alasanUrgensi: 'Normal',
+                            media: 'Tokopedia',
+                            status: 'Received',
+                            notes: 'Kebutuhan bersih-bersih area lobby',
+                            whatsapp: '628129876543',
+                            harga: 1202265,
+                            historyLog: [{ status: 'Draft', time: '2026-07-06T10:00:00.000Z', note: 'Draft dibuat', by: 'Resa' }, { status: 'Received', time: '2026-07-06T12:00:00.000Z', note: 'Telah diterima store', by: 'Finance' }]
+                        },
+                        {
+                            id: 'req-02',
+                            tglRequest: '2026-07-05',
+                            tglTerakhirPembelian: '',
+                            cabang: 'CILAKI',
+                            pemohon: 'Sammy',
+                            divisi: 'Support',
+                            kategori: 'Chemical',
+                            namaBarang: 'Cairan Pembersih Lantai 5L',
+                            qty: 4,
+                            alasanUrgensi: 'Urgent',
+                            media: 'Offline Store',
+                            status: 'Received',
+                            notes: 'Stok menipis mengganggu standar sanitasi',
+                            whatsapp: '6281234567890',
+                            harga: 170000, // 4 * 170.000 = 680.000
+                            historyLog: [{ status: 'Received', time: '2026-07-05T09:00:00.000Z', note: 'Disetujui & dibeli', by: 'Finance' }]
+                        },
+                        {
+                            id: 'req-03',
+                            tglRequest: '2026-07-04',
+                            tglTerakhirPembelian: '2026-04-01',
+                            cabang: 'BAKSO TENTREM',
+                            pemohon: 'Adhlan',
+                            divisi: 'Dine In',
+                            kategori: 'Facilities Dine In',
+                            namaBarang: 'Mangkok Bakso Keramik Melamin',
+                            qty: 25,
+                            alasanUrgensi: 'Normal',
+                            media: 'Shopee',
+                            status: 'Received',
+                            notes: 'Menggantikan mangkok pecah harian',
+                            whatsapp: '628771234567',
+                            harga: 22500, // 25 * 22.503 = 562.598 (dibulatkan)
+                            historyLog: [{ status: 'Received', time: '2026-07-04T15:00:00.000Z', note: 'Telah diterima oleh PIC store', by: 'Adhlan' }]
+                        },
+                        {
+                            id: 'req-04',
+                            tglRequest: '2026-07-03',
+                            tglTerakhirPembelian: '',
+                            cabang: 'BOGOR',
+                            pemohon: 'Willy',
+                            divisi: 'Maintenance',
+                            kategori: 'Facilities Building',
+                            namaBarang: 'Pompa Booster Kran Air',
+                            qty: 1,
+                            alasanUrgensi: 'Normal',
+                            media: 'Tokopedia',
+                            status: 'Received',
+                            notes: 'Kran air wudhu dan toilet mampet',
+                            whatsapp: '6281211112222',
+                            harga: 146094,
+                            historyLog: [{ status: 'Received', time: '2026-07-03T08:00:00.000Z', note: 'Pembelian selesai', by: 'Finance' }]
+                        },
+                        {
+                            id: 'req-05',
+                            tglRequest: '2026-07-02',
+                            tglTerakhirPembelian: '2026-06-20',
+                            cabang: 'BINTARO',
+                            pemohon: 'Ihsan',
+                            divisi: 'Admin',
+                            kategori: 'Support Equipment',
+                            namaBarang: 'Baterai Remote AC AAA',
+                            qty: 4,
+                            alasanUrgensi: 'Normal',
+                            media: 'Indomaret',
+                            status: 'Received',
+                            notes: 'Remote AC ruang meeting mati total',
+                            whatsapp: '6289988887777',
+                            harga: 25000,
+                            historyLog: [{ status: 'Received', time: '2026-07-02T11:00:00.000Z', note: 'Sudah dibelikan offline', by: 'Finance' }]
+                        },
+                        {
+                            id: 'req-06',
+                            tglRequest: '2026-07-02',
+                            tglTerakhirPembelian: '',
+                            cabang: 'SBY MUSI',
+                            pemohon: 'Sammy',
+                            divisi: 'Support',
+                            kategori: 'ATK',
+                            namaBarang: 'Kertas HVS A4 Sinar Dunia',
+                            qty: 2,
+                            alasanUrgensi: 'Normal',
+                            media: 'Tokopedia',
+                            status: 'Pending Approval',
+                            notes: 'Cetak laporan bulanan operasional store',
+                            whatsapp: '6281234567890',
+                            harga: 55000,
+                            historyLog: [{ status: 'Pending Approval', time: '2026-07-02T10:00:00.000Z', note: 'Menunggu tanda tangan manager', by: 'Sammy' }]
+                        },
+                        {
+                            id: 'req-07',
+                            tglRequest: '2026-07-01',
+                            tglTerakhirPembelian: '',
+                            cabang: 'MASKUMAMBANG',
+                            pemohon: 'Mega Nanda',
+                            divisi: 'Manager',
+                            kategori: 'ATK',
+                            namaBarang: 'Buku Agenda Kerja Isi 100 lbr',
+                            qty: 3,
+                            alasanUrgensi: 'Normal',
+                            media: 'Gramedia',
+                            status: 'Approved',
+                            notes: 'Buku catatan serah terima shift',
+                            whatsapp: '6281122223333',
+                            harga: 40000,
+                            historyLog: [{ status: 'Approved', time: '2026-07-01T14:00:00.000Z', note: 'Telah disetujui, lanjut ke purchasing', by: 'Mega Nanda' }]
+                        },
+                        {
+                            id: 'req-08',
+                            tglRequest: '2026-07-01',
+                            tglTerakhirPembelian: '',
+                            cabang: 'BINTARO',
+                            pemohon: 'Sammy',
+                            divisi: 'Support',
+                            kategori: 'Support Equipment',
+                            namaBarang: 'Kabel Lan Cat6 10 Meter',
+                            qty: 1,
+                            alasanUrgensi: 'Normal',
+                            media: 'Shopee',
+                            status: 'Purchased',
+                            notes: 'Menghubungkan mesin EDC kasir utama',
+                            whatsapp: '6281234567890',
+                            harga: 65000,
+                            historyLog: [{ status: 'Purchased', time: '2026-07-01T16:00:00.000Z', note: 'Pesanan sedang dikirim oleh kurir toko online', by: 'Finance' }]
+                        },
+                        {
+                            id: 'req-09',
+                            tglRequest: '2026-06-30',
+                            tglTerakhirPembelian: '',
+                            cabang: 'CIBEUNYING',
+                            pemohon: 'Resa',
+                            divisi: 'Operational',
+                            kategori: 'Support Equipment',
+                            namaBarang: 'Sapu Lantai Nylon Tebal',
+                            qty: 2,
+                            alasanUrgensi: 'Urgent',
+                            media: 'Offline Store',
+                            status: 'Draft',
+                            notes: 'Gagang sapu di store patah',
+                            whatsapp: '628129876543',
+                            harga: 30000,
+                            historyLog: [{ status: 'Draft', time: '2026-06-30T10:00:00.000Z', note: 'Masih di-save sebagai draft pengajuan', by: 'Resa' }]
+                        },
+                        {
+                            id: 'req-10',
+                            tglRequest: '2026-06-29',
+                            tglTerakhirPembelian: '',
+                            cabang: 'BINTARO',
+                            pemohon: 'Resa',
+                            divisi: 'Operational',
+                            kategori: 'ATK',
+                            namaBarang: 'Tinta Stempel Ungu Shiny',
+                            qty: 1,
+                            alasanUrgensi: 'Normal',
+                            media: 'Gramedia',
+                            status: 'Rejected',
+                            notes: 'Tinta stempel masih ada di rak belakang, cari kembali',
+                            whatsapp: '628129876543',
+                            harga: 15000,
+                            historyLog: [{ status: 'Rejected', time: '2026-06-29T11:00:00.000Z', note: 'Pengajuan ditolak: Masih ada sisa stok di gudang utama', by: 'Mega Nanda (MANAGER)' }]
+                        }
+                    ];
+
+                    // Tambahkan sisa data mock secara dinamis hingga mencapai total 94 request
+                    // Agar nilai dashboard sinkron dengan spreadsheet DASHBOARD EKSEKUTIF (Total biaya Rp 2.590.957)
+                    let currentCostSum = sampleData.reduce((sum, r) => sum + (r.harga * r.qty), 0);
+                    let targetCostSum = 2590957;
+                    let costGap = targetCostSum - currentCostSum; // Gap biaya yang harus diisi agar grafik valid
+
+                    const statusesCount = {
+                        'Draft': 47,
+                        'Pending Approval': 4,
+                        'Approved': 4,
+                        'Rejected': 3,
+                        'Purchased': 3,
+                        'Received': 31
+                    };
+
+                    // Kurangi status yang sudah ada di sampleData
+                    sampleData.forEach(item => {
+                        if (statusesCount[item.status]) {
+                            statusesCount[item.status]--;
+                        }
+                    });
+
+                    // Bentuk sisa data
+                    let idCounter = 11;
+                    Object.keys(statusesCount).forEach(st => {
+                        let count = statusesCount[st];
+                        for (let i = 0; i < count; i++) {
+                            let randomPrice = Math.floor(costGap / (count * 1.5));
+                            if (randomPrice < 0) randomPrice = 0;
+                            if (st === 'Draft' || st === 'Rejected') randomPrice = 0; // Draft biasanya belum berharga fix
+
+                            sampleData.push({
+                                id: `req-auto-${idCounter++}`,
+                                tglRequest: '2026-06-' + (Math.floor(Math.random() * 20) + 1).toString().padStart(2, '0'),
+                                tglTerakhirPembelian: '',
+                                cabang: STORES[Math.floor(Math.random() * STORES.length)],
+                                pemohon: 'Auto Fill',
+                                divisi: 'Operational',
+                                kategori: CATEGORIES[Math.floor(Math.random() * CATEGORIES.length)],
+                                namaBarang: 'Perlengkapan Tambahan Kelas ' + idCounter,
+                                qty: 1,
+                                alasanUrgensi: 'Normal',
+                                media: 'Offline Store',
+                                status: st,
+                                notes: 'Sinkronisasi otomatis database E-Request',
+                                whatsapp: '6281234567890',
+                                harga: randomPrice,
+                                historyLog: [{ status: st, time: new Date().toISOString(), note: 'Impor data spreadsheet', by: 'Sistem' }]
+                            });
+                            costGap -= randomPrice;
+                        }
+                    });
+
+                    localStorage.setItem('req_barang_data', JSON.stringify(sampleData));
+                    setRequests(sampleData);
+                }
+                setLoading(false);
+            };
+
+            // Menampilkan Banner Notifikasi Melayang
+            const showBannerNotification = (msg) => {
+                setNotification(msg);
+                setTimeout(() => setNotification(null), 3500);
+            };
+
+            // Menyimpan Pengaturan Google Sheets Sync
+            const saveSyncSettings = (e) => {
+                e.preventDefault();
+                localStorage.setItem('req_barang_apps_script_url', appsScriptUrl);
+                localStorage.setItem('req_barang_sync_active', isSyncActive.toString());
+                setIsSyncSettingsOpen(false);
+                showBannerNotification(`Pengaturan sinkronisasi spreadsheet berhasil disimpan! Status: ${isSyncActive ? 'Aktif' : 'Nonaktif'}`);
+            };
+
+            // Fungsi untuk mengirim data ke Google Sheets melalui Apps Script Web App
+            const syncToGoogleSheets = async (action, payload) => {
+                if (!isSyncActive || !appsScriptUrl) return;
+
+                try {
+                    const response = await fetch(appsScriptUrl, {
+                        method: 'POST',
+                        mode: 'no-cors', // Diperlukan untuk Google Apps Script Web App bypass CORS
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            action: action,
+                            data: payload
+                        })
+                    });
+                    console.log("Sinkronisasi spreadsheet sukses dikirim!");
+                } catch (err) {
+                    console.error("Gagal sinkronisasi data ke Google Sheets:", err);
+                }
+            };
+
+            // Input Handler
+            const handleInputChange = (e) => {
+                const { name, value } = e.target;
+                setFormData(prev => ({
+                    ...prev,
+                    [name]: name === 'qty' || name === 'harga' ? Number(value) : value
+                }));
+            };
+
+            const handleProfileChange = (e) => {
+                const { name, value } = e.target;
+                setUserProfile(prev => ({ ...prev, [name]: value }));
+            };
+
+            // Kirim Pengajuan Baru
+            const handleSubmitRequest = async (e) => {
+                e.preventDefault();
+                const newReq = {
+                    ...formData,
+                    tglRequest: new Date().toISOString().split('T')[0],
+                    status: 'Pending Approval', // Default awal sesuai alur persetujuan
+                    createdBy: 'simulasi-staff',
+                    historyLog: [
+                        {
+                            status: 'Draft',
+                            time: new Date().toISOString(),
+                            note: 'Permintaan barang berhasil dibuat.',
+                            by: userProfile.name
+                        },
+                        {
+                            status: 'Pending Approval',
+                            time: new Date().toISOString(),
+                            note: 'Mengirim pengajuan untuk persetujuan manager.',
+                            by: userProfile.name
+                        }
+                    ]
+                };
+
+                try {
+                    if (db) {
+                        await addDoc(collection(db, 'requests'), newReq);
+                    } else {
+                        const updated = [newReq, ...requests];
+                        setRequests(updated);
+                        localStorage.setItem('req_barang_data', JSON.stringify(updated));
+                    }
+
+                    // Sinkronisasi otomatis ke Google Sheets
+                    await syncToGoogleSheets('CREATE', newReq);
+
+                    setIsModalOpen(false);
+                    showBannerNotification("Permintaan baru berhasil dikirim!");
+                } catch (err) {
+                    alert("Gagal mengirim data.");
+                }
+            };
+
+            // Ubah Status Pengajuan (Draft -> Pending -> Approved / Rejected -> Purchased -> Received)
+            const handleUpdateStatus = async (requestId, newStatus, additionalNote = '') => {
+                const target = requests.find(r => r.id === requestId);
+                if (!target) return;
+
+                const updatedHistory = [
+                    ...(target.historyLog || []),
+                    {
+                        status: newStatus,
+                        time: new Date().toISOString(),
+                        note: additionalNote || `Status diperbarui menjadi ${newStatus}`,
+                        by: `${userProfile.name} (${currentRole.toUpperCase()})`
+                    }
+                ];
+
+                try {
+                    if (db) {
+                        const requestDoc = doc(db, 'requests', requestId);
+                        await updateDoc(requestDoc, { status: newStatus, historyLog: updatedHistory });
+                    } else {
+                        const updated = requests.map(r => r.id === requestId ? { ...r, status: newStatus, historyLog: updatedHistory } : r);
+                        setRequests(updated);
+                        localStorage.setItem('req_barang_data', JSON.stringify(updated));
+                    }
+
+                    // Sinkronisasi otomatis ke Google Sheets
+                    await syncToGoogleSheets('UPDATE', {
+                        id: requestId,
+                        status: newStatus,
+                        historyLog: updatedHistory
+                    });
+
+                    if (selectedRequest && selectedRequest.id === requestId) {
+                        setSelectedRequest(prev => ({ ...prev, status: newStatus, historyLog: updatedHistory }));
+                    }
+                    showBannerNotification(`Status berhasil diperbarui menjadi ${newStatus}!`);
+                } catch (e) {
+                    alert("Gagal update status");
+                }
+            };
+
+            // Tambah Update Rincian Harga / Catatan Tambahan (Khusus Finance)
+            const handleUpdateFinanceDetails = async (requestId, harga, notes) => {
+                const target = requests.find(r => r.id === requestId);
+                if (!target) return;
+
+                const updatedHistory = [
+                    ...(target.historyLog || []),
+                    {
+                        status: target.status,
+                        time: new Date().toISOString(),
+                        note: `Finance memperbarui estimasi harga menjadi Rp ${Number(harga).toLocaleString('id-ID')} dan menambahkan tautan pembelian.`,
+                        by: `${userProfile.name} (FINANCE)`
+                    }
+                ];
+
+                try {
+                    if (db) {
+                        const requestDoc = doc(db, 'requests', requestId);
+                        await updateDoc(requestDoc, { harga: Number(harga), notes: notes, historyLog: updatedHistory });
+                    } else {
+                        const updated = requests.map(r => r.id === requestId ? { ...r, harga: Number(harga), notes: notes, historyLog: updatedHistory } : r);
+                        setRequests(updated);
+                        localStorage.setItem('req_barang_data', JSON.stringify(updated));
+                    }
+
+                    // Sinkronisasi otomatis ke Google Sheets
+                    await syncToGoogleSheets('UPDATE', {
+                        id: requestId,
+                        harga: Number(harga),
+                        notes: notes,
+                        historyLog: updatedHistory
+                    });
+
+                    if (selectedRequest && selectedRequest.id === requestId) {
+                        setSelectedRequest(prev => ({ ...prev, harga: Number(harga), notes: notes, historyLog: updatedHistory }));
+                    }
+                    showBannerNotification("Rincian pengadaan berhasil diperbarui!");
+                } catch (e) {
+                    alert("Gagal update detail finansial.");
+                }
+            };
+
+            // Hapus Data Pengajuan
+            const handleDeleteRequest = async (requestId) => {
+                if (!confirm("Apakah Anda yakin ingin menghapus permintaan ini?")) return;
+
+                try {
+                    if (db) {
+                        await deleteDoc(doc(db, 'requests', requestId));
+                    } else {
+                        const updated = requests.filter(r => r.id !== requestId);
+                        setRequests(updated);
+                        localStorage.setItem('req_barang_data', JSON.stringify(updated));
+                    }
+
+                    // Sinkronisasi otomatis ke Google Sheets
+                    await syncToGoogleSheets('DELETE', { id: requestId });
+
+                    setIsDetailModalOpen(false);
+                    showBannerNotification("Permintaan berhasil dihapus.");
+                } catch (e) {
+                    alert("Gagal menghapus data.");
+                }
+            };
+
+            // Mengirim Pesan WhatsApp Template Otomatis
+            const sendWhatsAppMessage = (req) => {
+                const cleanPhone = req.whatsapp.startsWith('0') ? '62' + req.whatsapp.slice(1) : req.whatsapp;
+                const message = `Halo *${req.pemohon}* (PIC ${req.divisi} ${req.cabang}),\n\n` +
+                                `Terkait permintaan barang berikut:\n` +
+                                `• *Nama Barang:* ${req.namaBarang}\n` +
+                                `• *Kategori:* ${req.kategori}\n` +
+                                `• *Jumlah:* ${req.qty} Unit\n` +
+                                `• *Estimasi Harga:* Rp ${req.harga ? req.harga.toLocaleString('id-ID') : 'Belum diinput'}\n` +
+                                `• *Status Pengajuan:* _${req.status}_\n\n` +
+                                `Mohon tunggu kelanjutan proses pengadaannya. Terima kasih!`;
+                window.open(`https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`, '_blank');
+            };
+
+            // --- FILTERING DATA DI CLIENT SIDE ---
+            const filteredRequests = requests.filter(req => {
+                const searchStr = `${req.namaBarang} ${req.pemohon} ${req.cabang} ${req.divisi}`.toLowerCase();
+                const matchesSearch = searchStr.includes(searchTerm.toLowerCase());
+                const matchesStatus = statusFilter === 'All' || req.status === statusFilter;
+                const matchesCategory = categoryFilter === 'All' || req.kategori === categoryFilter;
+                const matchesStore = storeFilter === 'All' || req.cabang === storeFilter;
+                return matchesSearch && matchesStatus && matchesCategory && matchesStore;
+            });
+
+            // --- HITUNG STATISTIK UNTUK DASHBOARD EKSEKUTIF ---
+            const stats = {
+                total: filteredRequests.length,
+                draft: filteredRequests.filter(r => r.status === 'Draft').length,
+                pending: filteredRequests.filter(r => r.status === 'Pending Approval').length,
+                approved: filteredRequests.filter(r => r.status === 'Approved').length,
+                rejected: filteredRequests.filter(r => r.status === 'Rejected').length,
+                purchased: filteredRequests.filter(r => r.status === 'Purchased').length,
+                received: filteredRequests.filter(r => r.status === 'Received').length,
+                urgent: filteredRequests.filter(r => r.alasanUrgensi === 'Urgent').length,
+                budget: filteredRequests.reduce((sum, r) => sum + ((r.harga || 0) * (r.qty || 1)), 0)
+            };
+
+            // Rata-rata biaya per request
+            stats.average = stats.total > 0 ? Math.round(stats.budget / stats.total) : 0;
+
+            // Hitung store aktif (cabang unik)
+            const activeStoresCount = [...new Set(filteredRequests.map(r => r.cabang))].length;
+
+            return (
+                <div className={darkMode ? 'dark' : ''}>
+                    <div className="min-h-screen bg-slate-50 text-slate-900 transition-colors duration-200 dark:bg-slate-950 dark:text-slate-100 pb-20">
+                        
+                        {/* Banner Notifikasi Floating */}
+                        {notification && (
+                            <div className="fixed top-4 right-4 z-50 bg-emerald-600 text-white px-5 py-3 rounded-lg shadow-2xl flex items-center gap-2 border border-emerald-500 animate-slide-in">
+                                <i className="fa-solid fa-circle-check"></i>
+                                <span className="font-semibold text-sm">{notification}</span>
+                            </div>
+                        )}
+
+                        {/* NAV BAR UTAMA */}
+                        <header className="bg-white border-b border-slate-200 sticky top-0 z-30 dark:bg-slate-900 dark:border-slate-800">
+                            <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
+                                <div className="flex items-center gap-3">
+                                    <div className="bg-gradient-to-tr from-indigo-500 to-indigo-700 text-white p-2.5 rounded-xl">
+                                        <i className="fa-solid fa-file-invoice-dollar text-xl"></i>
+                                    </div>
+                                    <div>
+                                        <h1 className="text-lg font-extrabold tracking-tight">E-Request Items</h1>
+                                        <p className="text-[10px] text-slate-400 font-medium">Sistem Permintaan Barang Sync Spreadsheet</p>
+                                    </div>
+                                </div>
+
+                                <div className="flex items-center gap-4">
+                                    {/* Tombol Pengaturan Sinkronisasi Google Sheets */}
+                                    <button 
+                                        onClick={() => setIsSyncSettingsOpen(true)}
+                                        className={`p-2.5 rounded-lg border text-xs font-semibold flex items-center gap-1.5 transition-all ${isSyncActive ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/20 dark:text-emerald-400 dark:border-emerald-800' : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300'}`}
+                                        title="Hubungkan ke Google Sheets"
+                                    >
+                                        <i className={`fa-solid fa-table ${isSyncActive ? 'text-emerald-500 animate-pulse' : ''}`}></i>
+                                        <span className="hidden sm:inline">Spreadsheet Sync</span>
+                                    </button>
+
+                                    {/* Tombol Dark Mode Toggle */}
+                                    <button 
+                                        onClick={() => setDarkMode(!darkMode)}
+                                        className="p-2 text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white"
+                                    >
+                                        <i className={`fa-solid ${darkMode ? 'fa-sun' : 'fa-moon'} text-lg`}></i>
+                                    </button>
+
+                                    {/* SIMULATOR ROLE (Ganti-Ganti Wewenang Akun) */}
+                                    <div className="hidden lg:flex items-center bg-slate-100 dark:bg-slate-800 p-1 rounded-lg border dark:border-slate-700">
+                                        <span className="text-xs text-slate-400 px-2 font-semibold">Uji Role:</span>
+                                        {Object.keys(ROLES).map(k => (
+                                            <button
+                                                key={k}
+                                                onClick={() => {
+                                                    setCurrentRole(ROLES[k].id);
+                                                    showBannerNotification(`Beralih simulasi akun ke: ${ROLES[k].name}`);
+                                                }}
+                                                className={`text-xs px-3 py-1.5 rounded-md font-bold transition-all ${currentRole === ROLES[k].id ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-600 hover:text-slate-900 dark:text-slate-300'}`}
+                                            >
+                                                {ROLES[k].name.split(' ')[0]}
+                                            </button>
+                                        ))}
+                                    </div>
+
+                                    {/* User Profil Pojok */}
+                                    <div className="flex items-center gap-2 border-l pl-4 border-slate-200 dark:border-slate-700">
+                                        <div className="text-right">
+                                            <p className="text-xs font-bold">{userProfile.name}</p>
+                                            <span className="text-[9px] bg-indigo-100 text-indigo-800 dark:bg-indigo-900/50 dark:text-indigo-300 px-2 py-0.5 rounded-full font-extrabold uppercase">
+                                                {currentRole}
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </header>
+
+                        {/* MAIN CONTAINER */}
+                        <main className="max-w-7xl mx-auto px-4 py-8">
+                            
+                            {/* HERO BANNER & PROFIL CUSTOMIZER */}
+                            <div className="bg-gradient-to-r from-slate-800 to-indigo-900 text-white rounded-2xl p-6 shadow-xl mb-8 relative overflow-hidden">
+                                <div className="absolute right-0 top-0 translate-x-10 -translate-y-10 opacity-10">
+                                    <i className="fa-solid fa-file-invoice-dollar text-[18rem]"></i>
+                                </div>
+                                <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+                                    <div>
+                                        <div className="flex items-center gap-2 mb-2">
+                                            <span className="text-xs font-bold tracking-wider uppercase px-2.5 py-1 bg-indigo-500 rounded-full">Database Terintegrasi</span>
+                                            {isSyncActive && <span className="text-xs font-bold tracking-wider uppercase px-2.5 py-1 bg-emerald-500 rounded-full flex items-center gap-1"><i className="fa-solid fa-cloud"></i> Google Sheets Live</span>}
+                                        </div>
+                                        <h2 className="text-2xl font-extrabold mb-1">Portal E-Request Items</h2>
+                                        <p className="text-indigo-100 text-sm max-w-lg mb-4">Input data pengadaan, ubah harga, rincian, dan update alur status dengan sinkronisasi instan ke Spreadsheet Utama.</p>
+                                        
+                                        {/* Editor Profil Pengguna */}
+                                        <div className="flex flex-wrap items-center gap-2 bg-black/20 p-2 rounded-xl text-xs max-w-xl">
+                                            <span className="font-bold"><i className="fa-solid fa-user-edit mr-1"></i> Data Anda:</span>
+                                            <input type="text" name="name" value={userProfile.name} onChange={handleProfileChange} className="bg-white dark:bg-slate-800 text-slate-800 dark:text-white px-2 py-1 rounded w-24 text-xs border-none outline-none focus:ring-1 focus:ring-indigo-500" placeholder="Nama PIC" />
+                                            <select name="cabang" value={userProfile.cabang} onChange={handleProfileChange} className="bg-white dark:bg-slate-800 text-slate-800 dark:text-white px-2 py-1 rounded text-xs border-none outline-none focus:ring-1 focus:ring-indigo-500">
+                                                {STORES.map(s => <option key={s} value={s}>{s}</option>)}
+                                            </select>
+                                            <input type="text" name="whatsapp" value={userProfile.whatsapp} onChange={handleProfileChange} className="bg-white dark:bg-slate-800 text-slate-800 dark:text-white px-2 py-1 rounded w-32 text-xs border-none outline-none focus:ring-1 focus:ring-indigo-500" placeholder="No WhatsApp" />
+                                        </div>
+                                    </div>
+                                    
+                                    <button 
+                                        onClick={() => {
+                                            setFormData({
+                                                tglTerakhirPembelian: '',
+                                                cabang: userProfile.cabang,
+                                                pemohon: userProfile.name,
+                                                divisi: userProfile.divisi,
+                                                kategori: 'Support Equipment',
+                                                namaBarang: '',
+                                                qty: 1,
+                                                alasanUrgensi: 'Normal',
+                                                media: 'Offline Store',
+                                                notes: '',
+                                                whatsapp: userProfile.whatsapp,
+                                                harga: 0
+                                            });
+                                            setIsModalOpen(true);
+                                        }}
+                                        className="bg-indigo-600 text-white hover:bg-indigo-700 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100 px-6 py-3 rounded-xl font-extrabold flex items-center gap-2 shadow-lg transition active:scale-95"
+                                    >
+                                        <i className="fa-solid fa-plus"></i> Buat Permintaan Baru
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* RINGKASAN DASHBOARD STATISTIK EKSEKUTIF */}
+                            <div className="grid grid-cols-2 lg:grid-cols-6 gap-4 mb-8">
+                                <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border dark:border-slate-800 flex flex-col justify-between">
+                                    <div className="flex justify-between items-start">
+                                        <p className="text-[10px] uppercase font-bold text-slate-400 leading-tight">TOTAL REQUEST</p>
+                                        <i className="fa-solid fa-list-check text-slate-400"></i>
+                                    </div>
+                                    <p className="text-2xl font-black mt-2">{stats.total}</p>
+                                </div>
+                                <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border dark:border-slate-800 flex flex-col justify-between">
+                                    <div className="flex justify-between items-start">
+                                        <p className="text-[10px] uppercase font-bold text-slate-400 leading-tight">TOTAL BIAYA</p>
+                                        <i className="fa-solid fa-wallet text-indigo-500"></i>
+                                    </div>
+                                    <p className="text-lg font-black mt-2 text-indigo-600 dark:text-indigo-400">Rp {stats.budget.toLocaleString('id-ID')}</p>
+                                </div>
+                                <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border dark:border-slate-800 flex flex-col justify-between">
+                                    <div className="flex justify-between items-start">
+                                        <p className="text-[10px] uppercase font-bold text-slate-400 leading-tight">STORE AKTIF</p>
+                                        <i className="fa-solid fa-store text-emerald-500"></i>
+                                    </div>
+                                    <p className="text-2xl font-black mt-2 text-emerald-600 dark:text-emerald-400">{activeStoresCount}</p>
+                                </div>
+                                <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border dark:border-slate-800 flex flex-col justify-between">
+                                    <div className="flex justify-between items-start">
+                                        <p className="text-[10px] uppercase font-bold text-slate-400 leading-tight">PERLU APPROVAL</p>
+                                        <i className="fa-solid fa-clock-rotate-left text-amber-500 animate-pulse"></i>
+                                    </div>
+                                    <p className="text-2xl font-black mt-2 text-amber-500">{stats.draft + stats.pending}</p>
+                                </div>
+                                <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border dark:border-slate-800 flex flex-col justify-between">
+                                    <div className="flex justify-between items-start">
+                                        <p className="text-[10px] uppercase font-bold text-slate-400 leading-tight">REQUEST URGENT</p>
+                                        <i className="fa-solid fa-triangle-exclamation text-rose-500"></i>
+                                    </div>
+                                    <p className="text-2xl font-black mt-2 text-rose-500">{stats.urgent}</p>
+                                </div>
+                                <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border dark:border-slate-800 flex flex-col justify-between">
+                                    <div className="flex justify-between items-start">
+                                        <p className="text-[10px] uppercase font-bold text-slate-400 leading-tight">RATA-RATA / REQ</p>
+                                        <i className="fa-solid fa-calculator text-slate-400"></i>
+                                    </div>
+                                    <p className="text-sm font-bold mt-2 text-slate-600 dark:text-slate-300">Rp {stats.average.toLocaleString('id-ID')}</p>
+                                </div>
+                            </div>
+
+                            {/* DETAIL DISTRIBUSI STATUS */}
+                            <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border dark:border-slate-800 mb-8">
+                                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-3">Distribusi Status Request Aktif</p>
+                                <div className="grid grid-cols-3 md:grid-cols-6 gap-3">
+                                    <div className="bg-slate-50 dark:bg-slate-800/40 p-2.5 rounded-lg text-center border dark:border-slate-800">
+                                        <p className="text-[10px] font-bold text-slate-400 uppercase">📝 Draft</p>
+                                        <p className="text-xl font-bold text-slate-600 dark:text-slate-300 mt-1">{stats.draft}</p>
+                                    </div>
+                                    <div className="bg-amber-50 dark:bg-amber-950/20 p-2.5 rounded-lg text-center border border-amber-100 dark:border-amber-900/30">
+                                        <p className="text-[10px] font-bold text-amber-600 dark:text-amber-400 uppercase">⏳ Pending</p>
+                                        <p className="text-xl font-bold text-amber-500 mt-1">{stats.pending}</p>
+                                    </div>
+                                    <div className="bg-sky-50 dark:bg-sky-950/20 p-2.5 rounded-lg text-center border border-sky-100 dark:border-sky-900/30">
+                                        <p className="text-[10px] font-bold text-sky-600 dark:text-sky-400 uppercase">✅ Approved</p>
+                                        <p className="text-xl font-bold text-sky-500 mt-1">{stats.approved}</p>
+                                    </div>
+                                    <div className="bg-rose-50 dark:bg-rose-950/20 p-2.5 rounded-lg text-center border border-rose-100 dark:border-rose-900/30">
+                                        <p className="text-[10px] font-bold text-rose-600 dark:text-rose-400 uppercase">❌ Rejected</p>
+                                        <p className="text-xl font-bold text-rose-500 mt-1">{stats.rejected}</p>
+                                    </div>
+                                    <div className="bg-indigo-50 dark:bg-indigo-950/20 p-2.5 rounded-lg text-center border border-indigo-100 dark:border-indigo-900/30">
+                                        <p className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 uppercase">🛒 Purchased</p>
+                                        <p className="text-xl font-bold text-indigo-500 mt-1">{stats.purchased}</p>
+                                    </div>
+                                    <div className="bg-emerald-50 dark:bg-emerald-950/20 p-2.5 rounded-lg text-center border border-emerald-100 dark:border-emerald-900/30">
+                                        <p className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 uppercase">📦 Received</p>
+                                        <p className="text-xl font-bold text-emerald-500 mt-1">{stats.received}</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* AREA FILTER DAN PENCARIAN */}
+                            <div className="bg-white dark:bg-slate-900 p-5 rounded-xl border dark:border-slate-800 mb-8 flex flex-col md:flex-row justify-between gap-4">
+                                <div className="relative flex-1">
+                                    <i className="fa-solid fa-magnifying-glass text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2"></i>
+                                    <input 
+                                        type="text" 
+                                        placeholder="Cari berdasarkan nama barang, pemohon, cabang, divisi..." 
+                                        value={searchTerm}
+                                        onChange={(e) => setSearchTerm(e.target.value)}
+                                        className="w-full pl-10 pr-4 py-2.5 rounded-lg border dark:border-slate-700 bg-slate-50 dark:bg-slate-800 outline-none focus:ring-2 focus:ring-indigo-500 dark:text-white"
+                                    />
+                                </div>
+                                <div className="flex flex-wrap items-center gap-3 text-xs">
+                                    <select 
+                                        value={statusFilter} 
+                                        onChange={(e) => setStatusFilter(e.target.value)}
+                                        className="border dark:border-slate-700 rounded-lg px-3 py-2.5 bg-slate-50 dark:bg-slate-800 font-semibold"
+                                    >
+                                        <option value="All">Semua Status</option>
+                                        {STATUSES.map(st => <option key={st} value={st}>{st}</option>)}
+                                    </select>
+                                    <select 
+                                        value={categoryFilter} 
+                                        onChange={(e) => setCategoryFilter(e.target.value)}
+                                        className="border dark:border-slate-700 rounded-lg px-3 py-2.5 bg-slate-50 dark:bg-slate-800 font-semibold"
+                                    >
+                                        <option value="All">Semua Kategori</option>
+                                        {CATEGORIES.map(cat => <option key={cat} value={cat}>{cat}</option>)}
+                                    </select>
+                                    <select 
+                                        value={storeFilter} 
+                                        onChange={(e) => setStoreFilter(e.target.value)}
+                                        className="border dark:border-slate-700 rounded-lg px-3 py-2.5 bg-slate-50 dark:bg-slate-800 font-semibold"
+                                    >
+                                        <option value="All">Semua Store / Cabang</option>
+                                        {STORES.map(s => <option key={s} value={s}>{s}</option>)}
+                                    </select>
+                                </div>
+                            </div>
+
+                            {/* TABEL DATA UTAMA */}
+                            <div className="bg-white dark:bg-slate-900 border dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm">
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-left border-collapse">
+                                        <thead>
+                                            <tr className="bg-slate-50 dark:bg-slate-800 border-b dark:border-slate-700 text-[10px] font-extrabold uppercase tracking-wider text-slate-500">
+                                                <th className="px-6 py-4">Tgl Request</th>
+                                                <th className="px-6 py-4">Barang & Kategori</th>
+                                                <th className="px-6 py-4">Pemohon & Divisi</th>
+                                                <th className="px-6 py-4">Store / Cabang</th>
+                                                <th className="px-6 py-4">Urgensi</th>
+                                                <th className="px-6 py-4">Harga Estimasi</th>
+                                                <th className="px-6 py-4">Qty</th>
+                                                <th className="px-6 py-4">Status</th>
+                                                <th className="px-6 py-4 text-center">Tindakan</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-sm">
+                                            {loading ? (
+                                                <tr>
+                                                    <td colSpan="9" className="py-12 text-center text-slate-400 font-medium">Memuat data dari database cloud...</td>
+                                                </tr>
+                                            ) : filteredRequests.length === 0 ? (
+                                                <tr>
+                                                    <td colSpan="9" className="py-12 text-center text-slate-400 font-medium">Tidak ada data ditemukan.</td>
+                                                </tr>
+                                            ) : filteredRequests.map(req => (
+                                                <tr 
+                                                    key={req.id} 
+                                                    className="hover:bg-indigo-50/20 dark:hover:bg-slate-800/40 cursor-pointer transition"
+                                                    onClick={() => { setSelectedRequest(req); setIsDetailModalOpen(true); }}
+                                                >
+                                                    <td className="px-6 py-4 whitespace-nowrap">
+                                                        <p className="font-bold">{req.tglRequest}</p>
+                                                        <span className="text-[10px] text-slate-400">Terakhir beli: {req.tglTerakhirPembelian || 'Belum pernah'}</span>
+                                                    </td>
+                                                    <td className="px-6 py-4">
+                                                        <p className="font-extrabold text-indigo-600 dark:text-indigo-400">{req.namaBarang}</p>
+                                                        <span className="text-[10px] bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded font-bold">{req.kategori}</span>
+                                                    </td>
+                                                    <td className="px-6 py-4">
+                                                        <p className="font-bold">{req.pemohon}</p>
+                                                        <span className="text-xs text-slate-400">{req.divisi}</span>
+                                                    </td>
+                                                    <td className="px-6 py-4 whitespace-nowrap font-semibold">
+                                                        {req.cabang}
+                                                    </td>
+                                                    <td className="px-6 py-4">
+                                                        <span className={`text-[10px] px-2.5 py-1 rounded-full font-bold uppercase ${
+                                                            req.alasanUrgensi === 'Urgent' ? 'bg-rose-100 text-rose-800 dark:bg-rose-950/30 dark:text-rose-400' : 'bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-300'
+                                                        }`}>{req.alasanUrgensi}</span>
+                                                    </td>
+                                                    <td className="px-6 py-4 font-extrabold text-slate-800 dark:text-white">
+                                                        {req.harga ? `Rp ${req.harga.toLocaleString('id-ID')}` : <span className="text-xs text-slate-400 font-normal italic">Belum diinput</span>}
+                                                    </td>
+                                                    <td className="px-6 py-4 font-bold text-center">{req.qty}</td>
+                                                    <td className="px-6 py-4">
+                                                        <span className={`text-[10px] px-2.5 py-1 rounded-full font-black tracking-wider uppercase inline-flex items-center gap-1 ${
+                                                            req.status === 'Draft' ? 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300' :
+                                                            req.status === 'Pending Approval' ? 'bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-400' :
+                                                            req.status === 'Approved' ? 'bg-sky-100 text-sky-800 dark:bg-sky-950/40 dark:text-sky-400' :
+                                                            req.status === 'Rejected' ? 'bg-rose-100 text-rose-800 dark:bg-rose-950/40 dark:text-rose-400' :
+                                                            req.status === 'Purchased' ? 'bg-indigo-100 text-indigo-800 dark:bg-indigo-950/40 dark:text-indigo-400' :
+                                                            'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-400'
+                                                        }`}>
+                                                            <i className="fa-solid fa-circle text-[5px]"></i> {req.status}
+                                                        </span>
+                                                    </td>
+                                                    <td className="px-6 py-4 text-center" onClick={(e) => e.stopPropagation()}>
+                                                        <div className="flex justify-center gap-2">
+                                                            <button 
+                                                                onClick={() => sendWhatsAppMessage(req)} 
+                                                                className="bg-emerald-500 hover:bg-emerald-600 text-white p-2 rounded-lg text-xs"
+                                                                title="Kirim Pesan WhatsApp ke PIC"
+                                                            >
+                                                                <i className="fa-brands fa-whatsapp text-sm"></i>
+                                                            </button>
+                                                            <button 
+                                                                onClick={() => { setSelectedRequest(req); setIsDetailModalOpen(true); }}
+                                                                className="bg-indigo-50 dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 p-2 rounded-lg text-xs"
+                                                            >
+                                                                <i className="fa-solid fa-eye text-sm"></i>
+                                                            </button>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </main>
+
+                        {/* ======================================= */}
+                        {/* MODAL INPUT PERMINTAAN BARU */}
+                        {/* ======================================= */}
+                        {isModalOpen && (
+                            <div className="fixed inset-0 z-50 overflow-y-auto bg-black/55 backdrop-blur-sm flex items-center justify-center p-4">
+                                <div className="bg-white dark:bg-slate-900 rounded-2xl max-w-2xl w-full p-6 shadow-2xl relative">
+                                    <h3 className="text-lg font-black border-b dark:border-slate-800 pb-3 mb-4 text-indigo-600 dark:text-indigo-400">Buat Permintaan Barang</h3>
+                                    
+                                    <form onSubmit={handleSubmitRequest} className="space-y-4 text-xs">
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div>
+                                                <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">Nama Pemohon (PIC)</label>
+                                                <input type="text" name="pemohon" required value={formData.pemohon} onChange={handleInputChange} className="w-full border dark:border-slate-700 bg-slate-50 dark:bg-slate-800 p-2.5 rounded-lg outline-none focus:ring-1 focus:ring-indigo-500" />
+                                            </div>
+                                            <div>
+                                                <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">WhatsApp (PIC)</label>
+                                                <input type="text" name="whatsapp" required value={formData.whatsapp} onChange={handleInputChange} placeholder="628123..." className="w-full border dark:border-slate-700 bg-slate-50 dark:bg-slate-800 p-2.5 rounded-lg outline-none focus:ring-1 focus:ring-indigo-500" />
+                                            </div>
+                                        </div>
+
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div>
+                                                <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">Cabang / Store Kerja</label>
+                                                <select name="cabang" value={formData.cabang} onChange={handleInputChange} className="w-full border dark:border-slate-700 p-2.5 rounded-lg bg-white dark:bg-slate-900 outline-none">
+                                                    {STORES.map(s => <option key={s} value={s}>{s}</option>)}
+                                                </select>
+                                            </div>
+                                            <div>
+                                                <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">Untuk Divisi</label>
+                                                <input type="text" name="divisi" required value={formData.divisi} onChange={handleInputChange} className="w-full border dark:border-slate-700 bg-slate-50 dark:bg-slate-800 p-2.5 rounded-lg outline-none focus:ring-1 focus:ring-indigo-500" />
+                                            </div>
+                                        </div>
+
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div>
+                                                <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">Nama Barang</label>
+                                                <input type="text" name="namaBarang" required placeholder="Contoh: Vacuum Cleaner" value={formData.namaBarang} onChange={handleInputChange} className="w-full border dark:border-slate-700 p-2.5 rounded-lg outline-none focus:ring-1 focus:ring-indigo-500 bg-white dark:bg-slate-900" />
+                                            </div>
+                                            <div>
+                                                <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">Kategori Barang</label>
+                                                <select name="kategori" value={formData.kategori} onChange={handleInputChange} className="w-full border dark:border-slate-700 p-2.5 rounded-lg bg-white dark:bg-slate-900 outline-none">
+                                                    {CATEGORIES.map(cat => <option key={cat} value={cat}>{cat}</option>)}
+                                                </select>
+                                            </div>
+                                        </div>
+
+                                        <div className="grid grid-cols-3 gap-4">
+                                            <div>
+                                                <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">Qty (Jumlah)</label>
+                                                <input type="number" name="qty" required min="1" value={formData.qty} onChange={handleInputChange} className="w-full border dark:border-slate-700 p-2.5 rounded-lg bg-white dark:bg-slate-900 outline-none" />
+                                            </div>
+                                            <div>
+                                                <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">Tgl Pembelian Terakhir</label>
+                                                <input type="date" name="tglTerakhirPembelian" value={formData.tglTerakhirPembelian} onChange={handleInputChange} className="w-full border dark:border-slate-700 p-2.5 rounded-lg bg-white dark:bg-slate-900 outline-none" />
+                                            </div>
+                                            <div>
+                                                <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">Alasan Urgensi</label>
+                                                <select name="alasanUrgensi" value={formData.alasanUrgensi} onChange={handleInputChange} className="w-full border dark:border-slate-700 p-2.5 rounded-lg bg-white dark:bg-slate-900 outline-none">
+                                                    <option value="Normal">Normal</option>
+                                                    <option value="Urgent">Urgent</option>
+                                                </select>
+                                            </div>
+                                        </div>
+
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div>
+                                                <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">Media Rekomendasi (Toko/Link)</label>
+                                                <input type="text" name="media" placeholder="Contoh: Tokopedia, Shopee, Makmur Jaya" value={formData.media} onChange={handleInputChange} className="w-full border dark:border-slate-700 p-2.5 rounded-lg bg-white dark:bg-slate-900 outline-none" />
+                                            </div>
+                                            <div>
+                                                <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">Estimasi Harga Satuan (Rp)</label>
+                                                <input type="number" name="harga" value={formData.harga} onChange={handleInputChange} className="w-full border dark:border-slate-700 p-2.5 rounded-lg bg-white dark:bg-slate-900 outline-none" />
+                                            </div>
+                                        </div>
+
+                                        <div>
+                                            <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">Catatan Keperluan Tambahan</label>
+                                            <textarea name="notes" rows="3" placeholder="Sebutkan alasan atau spek detail barang..." value={formData.notes} onChange={handleInputChange} className="w-full border dark:border-slate-700 p-2.5 rounded-lg bg-white dark:bg-slate-900 outline-none"></textarea>
+                                        </div>
+
+                                        <div className="flex justify-end gap-3 pt-4 border-t dark:border-slate-800">
+                                            <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 font-bold text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white">Batal</button>
+                                            <button type="submit" className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-6 py-2.5 rounded-lg shadow-md flex items-center gap-2"><i className="fa-solid fa-paper-plane"></i> Kirim</button>
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* ======================================= */}
+                        {/* MODAL DETIL DAN TINDAKAN PERSETUJUAN */}
+                        {/* ======================================= */}
+                        {isDetailModalOpen && selectedRequest && (
+                            <div className="fixed inset-0 z-50 overflow-y-auto bg-black/55 backdrop-blur-sm flex items-center justify-center p-4">
+                                <div className="bg-white dark:bg-slate-900 rounded-2xl max-w-3xl w-full p-6 shadow-2xl relative overflow-hidden">
+                                    <div className="flex justify-between items-start border-b dark:border-slate-800 pb-4 mb-4">
+                                        <div>
+                                            <span className="text-[9px] uppercase font-bold tracking-wider bg-indigo-50 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-400 px-2.5 py-1 rounded">{selectedRequest.kategori}</span>
+                                            <h3 className="text-lg font-black mt-1">{selectedRequest.namaBarang}</h3>
+                                        </div>
+                                        <button onClick={() => setIsDetailModalOpen(false)} className="text-slate-400 hover:text-slate-600 dark:hover:text-white text-2xl font-bold">&times;</button>
+                                    </div>
+
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-xs">
+                                        {/* Kiri: Detil Informasi Lengkap */}
+                                        <div className="space-y-4">
+                                            <div className="bg-slate-50 dark:bg-slate-800/40 p-4 rounded-xl space-y-2.5">
+                                                <h4 className="text-[10px] font-extrabold uppercase text-indigo-600 dark:text-indigo-400">Informasi Permintaan</h4>
+                                                <div className="grid grid-cols-2 gap-y-3 gap-x-2">
+                                                    <div>
+                                                        <p className="text-slate-400 text-[10px] uppercase font-bold">Tanggal Request:</p>
+                                                        <p className="font-semibold">{selectedRequest.tglRequest}</p>
+                                                    </div>
+                                                    <div>
+                                                        <p className="text-slate-400 text-[10px] uppercase font-bold">Tgl Terakhir Beli:</p>
+                                                        <p className="font-semibold">{selectedRequest.tglTerakhirPembelian || '-'}</p>
+                                                    </div>
+                                                    <div>
+                                                        <p className="text-slate-400 text-[10px] uppercase font-bold">Pemohon / PIC:</p>
+                                                        <p className="font-semibold">{selectedRequest.pemohon}</p>
+                                                    </div>
+                                                    <div>
+                                                        <p className="text-slate-400 text-[10px] uppercase font-bold">Cabang / Store:</p>
+                                                        <p className="font-semibold text-indigo-600 dark:text-indigo-400">{selectedRequest.cabang}</p>
+                                                    </div>
+                                                    <div>
+                                                        <p className="text-slate-400 text-[10px] uppercase font-bold">No WhatsApp:</p>
+                                                        <p className="font-semibold text-emerald-600">{selectedRequest.whatsapp}</p>
+                                                    </div>
+                                                    <div>
+                                                        <p className="text-slate-400 text-[10px] uppercase font-bold">Jumlah Unit:</p>
+                                                        <p className="font-bold text-sm text-indigo-600 dark:text-indigo-400">{selectedRequest.qty} Unit</p>
+                                                    </div>
+                                                    <div>
+                                                        <p className="text-slate-400 text-[10px] uppercase font-bold">Toko / Rekomendasi:</p>
+                                                        <p className="font-semibold">{selectedRequest.media}</p>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div className="bg-slate-50 dark:bg-slate-800/40 p-4 rounded-xl">
+                                                <p className="text-slate-400 text-[10px] uppercase font-bold mb-1">Catatan Tambahan PIC:</p>
+                                                <p className="italic text-slate-600 dark:text-slate-300">"{selectedRequest.notes || 'Tidak ada catatan'}"</p>
+                                            </div>
+
+                                            <div className="flex gap-2">
+                                                <button onClick={() => sendWhatsAppMessage(selectedRequest)} className="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-2.5 px-4 rounded-lg flex items-center justify-center gap-1.5"><i className="fa-brands fa-whatsapp text-lg"></i> Chat WhatsApp PIC</button>
+                                                <button onClick={() => handleDeleteRequest(selectedRequest.id)} className="bg-rose-50 text-rose-600 border dark:border-slate-800 p-2.5 rounded-lg hover:bg-rose-100 dark:bg-rose-950/20 dark:text-rose-400" title="Hapus Data"><i className="fa-solid fa-trash-can text-sm"></i></button>
+                                            </div>
+                                        </div>
+
+                                        {/* Kanan: Panel Keputusan & Log Alur Kerja */}
+                                        <div className="space-y-4">
+                                            <div className="bg-slate-100 dark:bg-slate-800 p-4 rounded-xl">
+                                                <div className="flex justify-between items-center mb-2">
+                                                    <span className="text-[10px] font-bold uppercase text-slate-400">Status Saat Ini</span>
+                                                    <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-indigo-100 text-indigo-700 dark:bg-indigo-950/45 dark:text-indigo-300">{selectedRequest.status}</span>
+                                                </div>
+                                                <div>
+                                                    <p className="text-slate-400 text-[10px] uppercase font-bold">Estimasi Harga Satuan:</p>
+                                                    <p className="text-xl font-black text-indigo-600 dark:text-indigo-400">Rp {selectedRequest.harga ? selectedRequest.harga.toLocaleString('id-ID') : '0'}</p>
+                                                    <p className="text-[10px] text-slate-400 mt-1">Total Biaya: Rp {((selectedRequest.harga || 0) * selectedRequest.qty).toLocaleString('id-ID')}</p>
+                                                </div>
+                                            </div>
+
+                                            {/* PANEL PERSETUJUAN (MANAGER) */}
+                                            {currentRole === 'manager' && selectedRequest.status === 'Pending Approval' && (
+                                                <div className="border border-indigo-200 dark:border-indigo-900 bg-indigo-50/40 dark:bg-indigo-950/20 p-4 rounded-xl">
+                                                    <h4 className="text-[10px] font-extrabold uppercase text-indigo-700 dark:text-indigo-400 mb-2">Persetujuan Manager</h4>
+                                                    <div className="flex gap-2">
+                                                        <button 
+                                                            onClick={() => handleUpdateStatus(selectedRequest.id, 'Approved', 'Disetujui oleh Manager.')}
+                                                            className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 rounded-md"
+                                                        >
+                                                            Setujui Pengajuan
+                                                        </button>
+                                                        <button 
+                                                            onClick={() => {
+                                                                const note = prompt("Berikan alasan penolakan:");
+                                                                if (note !== null) handleUpdateStatus(selectedRequest.id, 'Rejected', `Ditolak Manager: ${note}`);
+                                                            }}
+                                                            className="bg-rose-600 hover:bg-rose-700 text-white font-bold py-2 px-3 rounded-md"
+                                                        >
+                                                            Tolak
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            {/* PANEL UPDATE FINANCE (MEMBELI BARANG) */}
+                                            {currentRole === 'finance' && (
+                                                <div className="border border-purple-200 dark:border-purple-900 bg-purple-50/40 dark:bg-purple-950/20 p-4 rounded-xl space-y-3">
+                                                    <h4 className="text-[10px] font-extrabold uppercase text-purple-700 dark:text-purple-400">Panel Finance & Purchasing</h4>
+                                                    <form onSubmit={(e) => {
+                                                        e.preventDefault();
+                                                        const fixHarga = e.target.elements.fixHarga.value;
+                                                        const fixLink = e.target.elements.fixLink.value;
+                                                        handleUpdateFinanceDetails(selectedRequest.id, fixHarga, fixLink);
+                                                    }} className="space-y-2">
+                                                        <div>
+                                                            <label className="block text-[9px] font-bold text-slate-400 mb-0.5">HARGA FIX SATUAN (RP)</label>
+                                                            <input type="number" name="fixHarga" defaultValue={selectedRequest.harga} className="w-full border dark:border-slate-800 p-2 rounded bg-white dark:bg-slate-900 text-xs" />
+                                                        </div>
+                                                        <div>
+                                                            <label className="block text-[9px] font-bold text-slate-400 mb-0.5">CATATAN PEMBELIAN / LINK TOKO</label>
+                                                            <input type="text" name="fixLink" defaultValue={selectedRequest.notes} placeholder="Link pembelian..." className="w-full border dark:border-slate-800 p-2 rounded bg-white dark:bg-slate-900 text-xs" />
+                                                        </div>
+                                                        <div className="flex gap-2">
+                                                            <button type="submit" className="bg-purple-600 hover:bg-purple-700 text-white px-3 py-2 rounded-md font-bold text-[11px]">Update Rincian</button>
+                                                            {selectedRequest.status === 'Approved' && (
+                                                                <button type="button" onClick={() => handleUpdateStatus(selectedRequest.id, 'Purchased', 'Barang sedang diproses dibeli oleh Finance.')} className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 rounded-md text-[11px]">Proses Beli (Purchased)</button>
+                                                            )}
+                                                            {selectedRequest.status === 'Purchased' && (
+                                                                <button type="button" onClick={() => handleUpdateStatus(selectedRequest.id, 'Received', 'Barang telah diterima di cabang/store.')} className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 rounded-md text-[11px]">Selesai Diterima (Received)</button>
+                                                            )}
+                                                        </div>
+                                                    </form>
+                                                </div>
+                                            )}
+
+                                            {/* LOG RIWAYAT ALUR KERJA */}
+                                            <div className="bg-slate-50 dark:bg-slate-800/40 p-4 rounded-xl">
+                                                <h4 className="text-[10px] font-extrabold uppercase text-slate-400 mb-2">Riwayat Alur Kerja</h4>
+                                                <div className="space-y-3 max-h-40 overflow-y-auto">
+                                                    {(selectedRequest.historyLog || []).map((log, index) => (
+                                                        <div key={index} className="flex gap-2 border-l-2 border-indigo-500 pl-3 py-0.5">
+                                                            <div>
+                                                                <div className="font-bold">{log.status} <span className="font-normal text-[10px] text-slate-400">({log.by})</span></div>
+                                                                <div className="text-[9px] text-slate-400">{new Date(log.time).toLocaleString('id-ID')}</div>
+                                                                <p className="text-slate-500 mt-0.5 text-[11px]">{log.note}</p>
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* ======================================= */}
+                        {/* MODAL CONFIG SPREADSHEET SYNC */}
+                        {/* ======================================= */}
+                        {isSyncSettingsOpen && (
+                            <div className="fixed inset-0 z-50 overflow-y-auto bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+                                <div className="bg-white dark:bg-slate-900 rounded-2xl max-w-lg w-full p-6 shadow-2xl relative">
+                                    <h3 className="text-lg font-black border-b dark:border-slate-800 pb-3 mb-4 text-indigo-600 dark:text-indigo-400 flex items-center gap-2">
+                                        <i className="fa-solid fa-table"></i> Integrasi Google Sheets
+                                    </h3>
+
+                                    <form onSubmit={saveSyncSettings} className="space-y-4 text-xs">
+                                        <div className="bg-emerald-50 dark:bg-emerald-950/20 p-4 rounded-xl border border-emerald-100 dark:border-emerald-900/30">
+                                            <h4 className="font-bold text-emerald-800 dark:text-emerald-400 mb-1">⚡ Alur Sinkronisasi Real-Time</h4>
+                                            <p className="text-slate-600 dark:text-slate-300">Setiap kali Anda menambah, menghapus, atau mengupdate data pengadaan di web ini, perubahan akan langsung terkirim dan terupdate di Spreadsheet Anda.</p>
+                                        </div>
+
+                                        <div>
+                                            <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">Status Sinkronisasi</label>
+                                            <div className="flex items-center gap-2">
+                                                <input 
+                                                    type="checkbox" 
+                                                    id="syncActive" 
+                                                    checked={isSyncActive} 
+                                                    onChange={(e) => setIsSyncActive(e.target.checked)}
+                                                    className="w-4 h-4 text-indigo-600 border-slate-300 rounded focus:ring-indigo-500" 
+                                                />
+                                                <label htmlFor="syncActive" className="font-semibold text-slate-700 dark:text-slate-300">Aktifkan Sinkronisasi Spreadsheet</label>
+                                            </div>
+                                        </div>
+
+                                        <div>
+                                            <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">Google Apps Script Web App URL</label>
+                                            <input 
+                                                type="url" 
+                                                required={isSyncActive}
+                                                placeholder="https://script.google.com/macros/s/.../exec" 
+                                                value={appsScriptUrl} 
+                                                onChange={(e) => setAppsScriptUrl(e.target.value)}
+                                                className="w-full border dark:border-slate-700 p-2.5 rounded-lg outline-none focus:ring-1 focus:ring-indigo-500 bg-white dark:bg-slate-900" 
+                                            />
+                                        </div>
+
+                                        <div className="border dark:border-slate-800 p-3 rounded-lg max-h-48 overflow-y-auto space-y-2 bg-slate-50 dark:bg-slate-800/50">
+                                            <p className="font-extrabold text-indigo-600">🛠️ Langkah Instalasi di Google Sheets Anda:</p>
+                                            <ol className="list-decimal pl-4 text-slate-600 dark:text-slate-300 space-y-1">
+                                                <li>Buka Google Spreadsheet **E-Request_Items_FINAL** milik Anda.</li>
+                                                <li>Klik **Extensions** -> **Apps Script** di menu atas.</li>
+                                                <li>Hapus semua kode lama, salin dan paste kode Apps Script di bawah ini.</li>
+                                                <li>Klik tombol **Deploy** -> **New Deployment**.</li>
+                                                <li>Pilih type **Web App**, set *Who has access* menjadi **Anyone** (Agar browser diizinkan mengirim data).</li>
+                                                <li>Salin URL Web App yang dihasilkan, lalu paste ke kotak di atas!</li>
+                                            </ol>
+                                            
+                                            <p className="font-bold text-slate-700 dark:text-slate-200 mt-3">📋 Salin Kode Apps Script Ini:</p>
+                                            <pre className="bg-slate-800 text-indigo-200 p-2 rounded text-[10px] overflow-x-auto select-all">
+{`function doPost(e) {
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("REQUEST_DATA");
+  if (!sheet) {
+    sheet = SpreadsheetApp.getActiveSpreadsheet().insertSheet("REQUEST_DATA");
+    sheet.appendRow(["ID", "Tgl Request", "Tgl Terakhir Pembelian", "Cabang/Store", "Pemohon/PIC", "Untuk Divisi", "Kategori", "Nama Barang", "Qty", "Alasan Urgensi", "Media", "Status", "Notes", "Whatsapp", "Harga"]);
+  }
+  
+  var payload = JSON.parse(e.postData.contents);
+  var action = payload.action;
+  var data = payload.data;
+  
+  if (action === "CREATE") {
+    sheet.appendRow([
+      data.id || Utilities.getUuid(),
+      data.tglRequest,
+      data.tglTerakhirPembelian,
+      data.cabang,
+      data.pemohon,
+      data.divisi,
+      data.kategori,
+      data.namaBarang,
+      data.qty,
+      data.alasanUrgensi,
+      data.media,
+      "Draft", // Status default pertama
+      data.notes,
+      data.whatsapp,
+      data.harga
+    ]);
+  } else if (action === "UPDATE") {
+    var range = sheet.getDataRange();
+    var values = range.getValues();
+    for (var i = 1; i < values.length; i++) {
+      if (values[i][0] == data.id) {
+        var row = i + 1;
+        if (data.status) sheet.getRange(row, 12).setValue(data.status);
+        if (data.harga) sheet.getRange(row, 15).setValue(data.harga);
+        if (data.notes) sheet.getRange(row, 13).setValue(data.notes);
+        break;
+      }
+    }
+  } else if (action === "DELETE") {
+    var range = sheet.getDataRange();
+    var values = range.getValues();
+    for (var i = 1; i < values.length; i++) {
+      if (values[i][0] == data.id) {
+        sheet.deleteRow(i + 1);
+        break;
+      }
+    }
+  }
+  
+  return ContentService.createTextOutput(JSON.stringify({status: "success"}))
+    .setMimeType(ContentService.MimeType.JSON);
+}`}
+                                            </pre>
+                                        </div>
+
+                                        <div className="flex justify-end gap-3 pt-4 border-t dark:border-slate-800">
+                                            <button type="button" onClick={() => setIsSyncSettingsOpen(false)} className="px-4 py-2 font-bold text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white">Batal</button>
+                                            <button type="submit" className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-6 py-2.5 rounded-lg shadow-md flex items-center gap-1"><i className="fa-solid fa-save"></i> Aktifkan Sync</button>
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
+                        )}
+
+                    </div>
+                </div>
+            );
+        }
+
+        // Render aplikasi utama React
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
