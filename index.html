@@ -1088,7 +1088,7 @@ function doPost(e) {
             const prevCategoryVal = state.activeFilterCategory;
             filterCategory.innerHTML = '<option value="ALL">Semua Kategori</option>';
             state.categories.forEach(c => {
-                filterCategory.innerHTML += `<option value="${c}">${c}</option>';
+                filterCategory.innerHTML += `<option value="${c}">${c}</option>`;
             });
             filterCategory.value = state.categories.includes(prevCategoryVal) ? prevCategoryVal : "ALL";
             state.activeFilterCategory = filterCategory.value;
