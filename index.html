@@ -386,6 +386,45 @@
                                 </div>
                             </div>
 
+                            <!-- DYNAMIC LIST MANAGEMENT SECTIONS -->
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-slate-100">
+                                <!-- Kelola Cabang -->
+                                <div class="space-y-3">
+                                    <h4 class="font-bold text-slate-800 text-xs uppercase tracking-wider flex items-center gap-1.5">
+                                        <i data-lucide="map-pin" class="w-4 h-4 text-indigo-600"></i>
+                                        Kelola Daftar Cabang Kantor
+                                    </h4>
+                                    <div class="flex gap-2">
+                                        <input type="text" id="new-branch-input" placeholder="Contoh: Cabang Bali"
+                                            class="flex-grow px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all">
+                                        <button onclick="addBranchOption()" class="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl transition-all text-xs font-bold">
+                                            Tambah
+                                        </button>
+                                    </div>
+                                    <div id="manager-branch-list" class="max-h-44 overflow-y-auto border border-slate-100 rounded-xl p-2 bg-slate-50/50 space-y-1.5 custom-scroll">
+                                        <!-- Dynamic branch tags here -->
+                                    </div>
+                                </div>
+
+                                <!-- Kelola Kategori -->
+                                <div class="space-y-3">
+                                    <h4 class="font-bold text-slate-800 text-xs uppercase tracking-wider flex items-center gap-1.5">
+                                        <i data-lucide="tag" class="w-4 h-4 text-indigo-600"></i>
+                                        Kelola Kategori Barang
+                                    </h4>
+                                    <div class="flex gap-2">
+                                        <input type="text" id="new-category-input" placeholder="Contoh: Elektronik"
+                                            class="flex-grow px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all">
+                                        <button onclick="addCategoryOption()" class="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl transition-all text-xs font-bold">
+                                            Tambah
+                                        </button>
+                                    </div>
+                                    <div id="manager-category-list" class="max-h-44 overflow-y-auto border border-slate-100 rounded-xl p-2 bg-slate-50/50 space-y-1.5 custom-scroll">
+                                        <!-- Dynamic category tags here -->
+                                    </div>
+                                </div>
+                            </div>
+
                             <!-- Guide Access Buttons -->
                             <div class="flex flex-wrap gap-3 pt-2">
                                 <button id="btn-show-sync-guide" class="flex items-center gap-2 px-4 py-2.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-semibold rounded-xl border border-emerald-200 transition-all">
@@ -793,6 +832,8 @@ function doPost(e) {
         const state = {
             isLoggedIn: false,
             requests: [],
+            branches: [],
+            categories: [],
             sheetsUrl: localStorage.getItem("erequest_sheets_url") || "",
             activeTab: "dashboard-tab",
             activeFilterBranch: "ALL",
@@ -817,6 +858,28 @@ function doPost(e) {
                 state.requests = [...INITIAL_EXCEL_DATA];
                 saveToLocalStorage();
             }
+
+            // Load saved branches or use default
+            const savedBranches = localStorage.getItem("erequest_branches");
+            if (savedBranches) {
+                state.branches = JSON.parse(savedBranches);
+            } else {
+                state.branches = ["Cabang Jakarta", "Cabang Bandung", "Cabang Surabaya", "Cabang Medan", "Cabang Makassar", "Cabang Semarang", "Cabang Yogyakarta"];
+                localStorage.setItem("erequest_branches", JSON.stringify(state.branches));
+            }
+
+            // Load saved categories or use default
+            const savedCategories = localStorage.getItem("erequest_categories");
+            if (savedCategories) {
+                state.categories = JSON.parse(savedCategories);
+            } else {
+                state.categories = ["IT Equipment", "Office Supplies", "Furniture", "Software", "Others"];
+                localStorage.setItem("erequest_categories", JSON.stringify(state.categories));
+            }
+
+            // Populate all dynamic options
+            populateDropdowns();
+            renderBranchAndCategoryManagers();
 
             // Sync Web App URL input
             if (state.sheetsUrl) {
@@ -918,6 +981,145 @@ function doPost(e) {
                 minimumFractionDigits: 0
             }).format(value);
         }
+
+        // ================= DYNAMIC LIST MANAGERS =================
+        function populateDropdowns() {
+            // 1. Populate Branch Filter
+            const filterBranch = document.getElementById("filter-branch");
+            const prevBranchVal = state.activeFilterBranch;
+            filterBranch.innerHTML = '<option value="ALL">Semua Cabang</option>';
+            state.branches.forEach(b => {
+                filterBranch.innerHTML += `<option value="${b}">${b}</option>`;
+            });
+            filterBranch.value = state.branches.includes(prevBranchVal) ? prevBranchVal : "ALL";
+            state.activeFilterBranch = filterBranch.value;
+
+            // 2. Populate Category Filter
+            const filterCategory = document.getElementById("filter-category");
+            const prevCategoryVal = state.activeFilterCategory;
+            filterCategory.innerHTML = '<option value="ALL">Semua Kategori</option>';
+            state.categories.forEach(c => {
+                filterCategory.innerHTML += `<option value="${c}">${c}</option>`;
+            });
+            filterCategory.value = state.categories.includes(prevCategoryVal) ? prevCategoryVal : "ALL";
+            state.activeFilterCategory = filterCategory.value;
+
+            // 3. Populate Form Branch Option Dropdown
+            const formBranch = document.getElementById("form-branch");
+            formBranch.innerHTML = '<option value="" disabled selected>Pilih Cabang</option>';
+            state.branches.forEach(b => {
+                formBranch.innerHTML += `<option value="${b}">${b}</option>`;
+            });
+
+            // 4. Populate Form Category Option Dropdown
+            const formCategory = document.getElementById("form-category");
+            formCategory.innerHTML = '<option value="" disabled selected>Pilih Kategori</option>';
+            state.categories.forEach(c => {
+                formCategory.innerHTML += `<option value="${c}">${c}</option>`;
+            });
+        }
+
+        function renderBranchAndCategoryManagers() {
+            const branchList = document.getElementById("manager-branch-list");
+            const categoryList = document.getElementById("manager-category-list");
+            if (!branchList || !categoryList) return;
+
+            // Render Branch list tags
+            branchList.innerHTML = "";
+            state.branches.forEach(b => {
+                const div = document.createElement("div");
+                div.className = "flex items-center justify-between px-3 py-1.5 bg-white border border-slate-100 rounded-lg text-xs font-semibold text-slate-700 shadow-sm";
+                div.innerHTML = `
+                    <span>${b}</span>
+                    <button onclick="deleteBranchOption('${b}')" class="text-rose-500 hover:text-rose-700 p-1 rounded-md transition-all hover:bg-rose-50">
+                        <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                    </button>
+                `;
+                branchList.appendChild(div);
+            });
+
+            // Render Category list tags
+            categoryList.innerHTML = "";
+            state.categories.forEach(c => {
+                const div = document.createElement("div");
+                div.className = "flex items-center justify-between px-3 py-1.5 bg-white border border-slate-100 rounded-lg text-xs font-semibold text-slate-700 shadow-sm";
+                div.innerHTML = `
+                    <span>${c}</span>
+                    <button onclick="deleteCategoryOption('${c}')" class="text-rose-500 hover:text-rose-700 p-1 rounded-md transition-all hover:bg-rose-50">
+                        <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                    </button>
+                `;
+                categoryList.appendChild(div);
+            });
+
+            lucide.createIcons();
+        }
+
+        function addBranchOption() {
+            const input = document.getElementById("new-branch-input");
+            const val = input.value.trim();
+            if (!val) return;
+            if (state.branches.includes(val)) {
+                showNotification("Gagal Tambah", "Cabang ini sudah ada dalam daftar.", "error");
+                return;
+            }
+            state.branches.push(val);
+            localStorage.setItem("erequest_branches", JSON.stringify(state.branches));
+            input.value = "";
+            populateDropdowns();
+            renderBranchAndCategoryManagers();
+            showNotification("Cabang Ditambahkan", `Cabang "${val}" berhasil ditambahkan ke daftar.`, "success");
+        }
+
+        function deleteBranchOption(branchName) {
+            // Validation check: Jangan hapus jika ada data pengajuan yang aktif menggunakannya
+            const inUse = state.requests.some(r => r.branch === branchName);
+            if (inUse) {
+                showNotification("Tidak Dapat Dihapus", `Cabang "${branchName}" sedang digunakan oleh data pengajuan yang ada.`, "error");
+                return;
+            }
+            state.branches = state.branches.filter(b => b !== branchName);
+            localStorage.setItem("erequest_branches", JSON.stringify(state.branches));
+            populateDropdowns();
+            renderBranchAndCategoryManagers();
+            showNotification("Cabang Dihapus", `Cabang "${branchName}" berhasil dihapus dari daftar.`, "info");
+        }
+
+        function addCategoryOption() {
+            const input = document.getElementById("new-category-input");
+            const val = input.value.trim();
+            if (!val) return;
+            if (state.categories.includes(val)) {
+                showNotification("Gagal Tambah", "Kategori ini sudah ada dalam daftar.", "error");
+                return;
+            }
+            state.categories.push(val);
+            localStorage.setItem("erequest_categories", JSON.stringify(state.categories));
+            input.value = "";
+            populateDropdowns();
+            renderBranchAndCategoryManagers();
+            showNotification("Kategori Ditambahkan", `Kategori "${val}" berhasil ditambahkan ke daftar.`, "success");
+        }
+
+        function deleteCategoryOption(categoryName) {
+            // Validation check: Jangan hapus jika ada data pengajuan yang aktif menggunakannya
+            const inUse = state.requests.some(r => r.category === categoryName);
+            if (inUse) {
+                showNotification("Tidak Dapat Dihapus", `Kategori "${categoryName}" sedang digunakan oleh data pengajuan yang ada.`, "error");
+                return;
+            }
+            state.categories = state.categories.filter(c => c !== categoryName);
+            localStorage.setItem("erequest_categories", JSON.stringify(state.categories));
+            populateDropdowns();
+            renderBranchAndCategoryManagers();
+            showNotification("Kategori Dihapus", `Kategori "${categoryName}" berhasil dihapus dari daftar.`, "info");
+        }
+
+        // Expose functions globally for dynamic onclick handlers
+        window.addBranchOption = addBranchOption;
+        window.deleteBranchOption = deleteBranchOption;
+        window.addCategoryOption = addCategoryOption;
+        window.deleteCategoryOption = deleteCategoryOption;
 
         // ================= NAVIGATION TAB CONTROLLERS =================
         function switchTab(tabId) {
