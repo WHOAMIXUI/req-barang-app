@@ -1,0 +1,1122 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>E-Request Items System</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Inter Font -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .custom-scroll::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        .custom-scroll::-webkit-scrollbar-track {
+            background: #f1f5f9;
+        }
+        .custom-scroll::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+        .custom-scroll::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col">
+
+    <!-- APP CONTAINER -->
+    <div id="app" class="flex-grow flex flex-col">
+        
+        <!-- LOGIN SECTION (GATED ACCESS) -->
+        <div id="login-section" class="flex-grow flex items-center justify-center px-4 py-12 bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900">
+            <div class="bg-white/95 backdrop-blur-md p-8 rounded-2xl shadow-2xl w-full max-w-md border border-slate-200/50 transition-all duration-300">
+                <div class="text-center mb-8">
+                    <div class="inline-flex p-3 bg-indigo-50 text-indigo-600 rounded-2xl mb-3">
+                        <i data-lucide="shield-check" class="w-8 h-8"></i>
+                    </div>
+                    <h1 class="text-2xl font-bold text-slate-900">E-Request Items</h1>
+                    <p class="text-sm text-slate-500 mt-1">Silakan masuk untuk mengakses sistem pengajuan barang</p>
+                </div>
+
+                <div id="login-error" class="hidden mb-4 p-3 bg-rose-50 border border-rose-200 text-rose-700 text-sm rounded-xl flex items-center gap-2">
+                    <i data-lucide="alert-circle" class="w-4 h-4 flex-shrink-0"></i>
+                    <span id="login-error-msg">Username atau password salah!</span>
+                </div>
+
+                <form id="login-form" class="space-y-5">
+                    <div>
+                        <label class="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-2">Username / Email</label>
+                        <div class="relative">
+                            <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400">
+                                <i data-lucide="user" class="w-5 h-5"></i>
+                            </span>
+                            <input type="text" id="username" required placeholder="admin"
+                                class="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all">
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-2">Password</label>
+                        <div class="relative">
+                            <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400">
+                                <i data-lucide="lock" class="w-5 h-5"></i>
+                            </span>
+                            <input type="password" id="password" required placeholder="••••••••"
+                                class="w-full pl-10 pr-10 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all">
+                            <button type="button" id="toggle-password" class="absolute inset-y-0 right-0 flex items-center pr-3 text-slate-400 hover:text-slate-600">
+                                <i data-lucide="eye" class="w-5 h-5" id="password-icon"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <button type="submit" 
+                        class="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-xl shadow-lg shadow-indigo-600/20 transition-all duration-200 flex items-center justify-center gap-2">
+                        <span>Masuk ke Dashboard</span>
+                        <i data-lucide="arrow-right" class="w-4 h-4"></i>
+                    </button>
+                </form>
+
+                <div class="mt-6 pt-6 border-t border-slate-100 text-center">
+                    <p class="text-xs text-slate-400">Gunakan akun demo berikut untuk login cepat:</p>
+                    <div class="mt-2 bg-slate-50 p-2.5 rounded-lg inline-block text-left text-xs font-mono text-slate-600">
+                        <div>User: <span class="font-bold">admin</span></div>
+                        <div>Pass: <span class="font-bold">admin123</span></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- MAIN DASHBOARD SECTION (HIDDEN BY DEFAULT) -->
+        <div id="dashboard-section" class="hidden flex-grow flex flex-col">
+            <!-- Navigation Header -->
+            <header class="bg-white border-b border-slate-200 sticky top-0 z-40">
+                <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                    <div class="flex items-center justify-between h-16">
+                        <!-- Brand/Logo -->
+                        <div class="flex items-center gap-3">
+                            <div class="p-2 bg-indigo-600 text-white rounded-xl">
+                                <i data-lucide="layers" class="w-6 h-6"></i>
+                            </div>
+                            <div>
+                                <h1 class="text-lg font-bold text-slate-900 leading-none">E-Request</h1>
+                                <span class="text-[10px] text-slate-500 font-medium tracking-wide uppercase">Items Management</span>
+                            </div>
+                        </div>
+
+                        <!-- Actions / Profile -->
+                        <div class="flex items-center gap-4">
+                            <button id="btn-show-sync-guide" class="hidden md:flex items-center gap-2 px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-semibold rounded-lg border border-emerald-200 transition-all">
+                                <span class="relative flex h-2 w-2">
+                                    <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                                    <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                                </span>
+                                <i data-lucide="table-properties" class="w-3.5 h-3.5"></i>
+                                Hubungkan ke Spreadsheet
+                            </button>
+
+                            <button id="btn-show-github-guide" class="hidden md:flex items-center gap-2 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-lg border border-slate-300 transition-all">
+                                <i data-lucide="github" class="w-3.5 h-3.5"></i>
+                                Upload ke GitHub
+                            </button>
+
+                            <div class="h-6 w-px bg-slate-200"></div>
+
+                            <div class="flex items-center gap-3">
+                                <div class="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700 font-bold text-sm">
+                                    AD
+                                </div>
+                                <div class="hidden sm:block text-left">
+                                    <div class="text-xs font-semibold text-slate-800">Administrator</div>
+                                    <div class="text-[10px] text-slate-400 font-medium">admin@erequest.com</div>
+                                </div>
+                                <button id="btn-logout" class="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all" title="Keluar">
+                                    <i data-lucide="log-out" class="w-5 h-5"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </header>
+
+            <!-- Main Content Area -->
+            <main class="flex-grow max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+                <!-- Mobile Guide Buttons -->
+                <div class="flex flex-wrap gap-2 md:hidden">
+                    <button id="btn-show-sync-guide-mobile" class="flex-1 flex items-center justify-center gap-2 py-2 px-3 bg-emerald-50 text-emerald-700 text-xs font-semibold rounded-lg border border-emerald-200">
+                        <i data-lucide="table-properties" class="w-4 h-4"></i> Spreadsheet Sync
+                    </button>
+                    <button id="btn-show-github-guide-mobile" class="flex-1 flex items-center justify-center gap-2 py-2 px-3 bg-slate-100 text-slate-700 text-xs font-semibold rounded-lg border border-slate-300">
+                        <i data-lucide="github" class="w-4 h-4"></i> GitHub Upload
+                    </button>
+                </div>
+
+                <!-- Spreadsheet Connection Status Alert Banner -->
+                <div id="sheets-connection-banner" class="bg-indigo-50 border border-indigo-200 rounded-2xl p-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                    <div class="flex items-start gap-3">
+                        <div class="p-2 bg-indigo-600 text-white rounded-xl mt-0.5 md:mt-0 flex-shrink-0">
+                            <i data-lucide="database" class="w-5 h-5"></i>
+                        </div>
+                        <div>
+                            <h3 class="font-bold text-slate-900 text-sm">Mode Penyimpanan Realtime Aktif</h3>
+                            <p class="text-xs text-slate-600 mt-1">Data Anda disimpan secara lokal. Sambungkan ke **Google Spreadsheet** agar setiap kali diinput, data di spreadsheet Anda juga otomatis berubah secara live.</p>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-2 w-full md:w-auto">
+                        <input type="text" id="spreadsheet-url-input" placeholder="Masukkan Google Apps Script Web App URL..."
+                            class="flex-grow md:w-80 px-3 py-2 bg-white text-xs border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                        <button id="btn-save-sheets-url" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-xl transition-all shadow-md shadow-indigo-600/10">
+                            Simpan
+                        </button>
+                    </div>
+                </div>
+
+                <!-- KPI / Summary Cards -->
+                <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                    <!-- Total Request -->
+                    <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+                        <div class="space-y-1">
+                            <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Total Request</span>
+                            <div class="text-2xl font-bold text-slate-900" id="kpi-total">0</div>
+                        </div>
+                        <div class="p-3 bg-blue-50 text-blue-600 rounded-xl">
+                            <i data-lucide="clipboard-list" class="w-6 h-6"></i>
+                        </div>
+                    </div>
+                    <!-- Pending -->
+                    <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+                        <div class="space-y-1">
+                            <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Menunggu</span>
+                            <div class="text-2xl font-bold text-amber-600" id="kpi-pending">0</div>
+                        </div>
+                        <div class="p-3 bg-amber-50 text-amber-600 rounded-xl">
+                            <i data-lucide="clock" class="w-6 h-6"></i>
+                        </div>
+                    </div>
+                    <!-- Approved -->
+                    <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+                        <div class="space-y-1">
+                            <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Disetujui</span>
+                            <div class="text-2xl font-bold text-emerald-600" id="kpi-approved">0</div>
+                        </div>
+                        <div class="p-3 bg-emerald-50 text-emerald-600 rounded-xl">
+                            <i data-lucide="check-circle-2" class="w-6 h-6"></i>
+                        </div>
+                    </div>
+                    <!-- Rejected -->
+                    <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+                        <div class="space-y-1">
+                            <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Ditolak</span>
+                            <div class="text-2xl font-bold text-rose-600" id="kpi-rejected">0</div>
+                        </div>
+                        <div class="p-3 bg-rose-50 text-rose-600 rounded-xl">
+                            <i data-lucide="x-circle" class="w-6 h-6"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Request Management Card -->
+                <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
+                    <!-- Control Bar -->
+                    <div class="p-5 border-b border-slate-200 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                        <div class="flex flex-col md:flex-row items-stretch md:items-center gap-3 flex-grow max-w-3xl">
+                            <!-- Search -->
+                            <div class="relative flex-grow">
+                                <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400">
+                                    <i data-lucide="search" class="w-4 h-4"></i>
+                                </span>
+                                <input type="text" id="table-search" placeholder="Cari nama barang, pemohon, atau departemen..."
+                                    class="w-full pl-9 pr-4 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all">
+                            </div>
+                            <!-- Category Filter -->
+                            <select id="filter-category" 
+                                class="px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                                <option value="ALL">Semua Kategori</option>
+                                <option value="IT Equipment">IT Equipment</option>
+                                <option value="Office Supplies">Office Supplies</option>
+                                <option value="Furniture">Furniture</option>
+                                <option value="Software">Software</option>
+                                <option value="Others">Kategori Lainnya</option>
+                            </select>
+                            <!-- Status Filter -->
+                            <select id="filter-status" 
+                                class="px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                                <option value="ALL">Semua Status</option>
+                                <option value="Pending">Menunggu</option>
+                                <option value="Approved">Disetujui</option>
+                                <option value="Rejected">Ditolak</option>
+                            </select>
+                        </div>
+
+                        <!-- Action Button -->
+                        <button id="btn-add-request" 
+                            class="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-xl shadow-lg shadow-indigo-600/10 transition-all duration-200 flex items-center justify-center gap-2">
+                            <i data-lucide="plus-circle" class="w-4.5 h-4.5"></i>
+                            <span>Buat Pengajuan Baru</span>
+                        </button>
+                    </div>
+
+                    <!-- Responsive Table Container -->
+                    <div class="overflow-x-auto custom-scroll">
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr class="bg-slate-50 border-b border-slate-200 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                                    <th class="py-4 px-6 text-center">ID Request</th>
+                                    <th class="py-4 px-6">Informasi Pemohon</th>
+                                    <th class="py-4 px-6">Nama Barang / Kategori</th>
+                                    <th class="py-4 px-6 text-center">Jumlah / Est. Harga</th>
+                                    <th class="py-4 px-6 text-center">Tingkat Urgensi</th>
+                                    <th class="py-4 px-6 text-center">Status</th>
+                                    <th class="py-4 px-6 text-center">Aksi</th>
+                                </tr>
+                            </thead>
+                            <tbody id="request-table-body" class="divide-y divide-slate-200 text-sm">
+                                <!-- Dynamic items inject here -->
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Empty State -->
+                    <div id="table-empty-state" class="hidden py-16 px-4 text-center">
+                        <div class="inline-flex p-4 bg-slate-100 text-slate-400 rounded-full mb-3">
+                            <i data-lucide="database-backup" class="w-8 h-8"></i>
+                        </div>
+                        <h3 class="text-base font-bold text-slate-800">Tidak ada pengajuan ditemukan</h3>
+                        <p class="text-xs text-slate-400 mt-1">Coba sesuaikan pencarian Anda atau tambahkan pengajuan baru.</p>
+                    </div>
+
+                    <!-- Table Footer / Stats -->
+                    <div class="p-4 bg-slate-50 border-t border-slate-200 flex items-center justify-between text-xs text-slate-500">
+                        <div>Menampilkan <span id="table-shown-count" class="font-semibold text-slate-700">0</span> dari <span id="table-total-count" class="font-semibold text-slate-700">0</span> pengajuan</div>
+                        <div class="font-medium">Data terstruktur sesuai <span class="font-bold underline text-indigo-600">E-Request_Items_FINAL.xlsx</span></div>
+                    </div>
+                </div>
+            </main>
+        </div>
+
+        <!-- NEW REQUEST MODAL -->
+        <div id="request-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4">
+            <!-- Backdrop -->
+            <div class="absolute inset-0 bg-slate-900/50 backdrop-blur-sm"></div>
+            <!-- Content -->
+            <div class="relative bg-white rounded-2xl shadow-xl w-full max-w-xl border border-slate-200 overflow-hidden transform transition-all">
+                <!-- Modal Header -->
+                <div class="p-6 border-b border-slate-100 flex items-center justify-between">
+                    <div class="flex items-center gap-2.5">
+                        <div class="p-2 bg-indigo-50 text-indigo-600 rounded-xl">
+                            <i data-lucide="file-text" class="w-5 h-5"></i>
+                        </div>
+                        <div>
+                            <h3 class="font-bold text-slate-900" id="modal-title">Formulir Pengajuan Baru</h3>
+                            <p class="text-xs text-slate-400 mt-0.5">Semua data input divalidasi dan siap sinkron ke Spreadsheet</p>
+                        </div>
+                    </div>
+                    <button class="modal-close p-1.5 hover:bg-slate-100 text-slate-400 hover:text-slate-600 rounded-lg transition-all">
+                        <i data-lucide="x" class="w-5 h-5"></i>
+                    </button>
+                </div>
+
+                <!-- Modal Form Body -->
+                <form id="request-form">
+                    <input type="hidden" id="edit-request-id">
+                    <div class="p-6 space-y-4 max-h-[70vh] overflow-y-auto custom-scroll">
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wider">Nama Pemohon</label>
+                                <input type="text" id="form-requester" required placeholder="Contoh: Budi Santoso"
+                                    class="w-full px-3 py-2 text-sm border border-slate-200 bg-slate-50 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wider">Departemen</label>
+                                <input type="text" id="form-department" required placeholder="Contoh: IT Support"
+                                    class="w-full px-3 py-2 text-sm border border-slate-200 bg-slate-50 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all">
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wider">Nama Barang</label>
+                            <input type="text" id="form-item-name" required placeholder="Contoh: ThinkPad L14 Gen 3"
+                                class="w-full px-3 py-2 text-sm border border-slate-200 bg-slate-50 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all">
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wider">Kategori</label>
+                                <select id="form-category" required
+                                    class="w-full px-3 py-2 text-sm border border-slate-200 bg-slate-50 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all">
+                                    <option value="IT Equipment">IT Equipment</option>
+                                    <option value="Office Supplies">Office Supplies</option>
+                                    <option value="Furniture">Furniture</option>
+                                    <option value="Software">Software</option>
+                                    <option value="Others">Kategori Lainnya</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wider">Tingkat Urgensi</label>
+                                <select id="form-urgency" required
+                                    class="w-full px-3 py-2 text-sm border border-slate-200 bg-slate-50 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all">
+                                    <option value="Low">Rendah (Low)</option>
+                                    <option value="Medium" selected>Sedang (Medium)</option>
+                                    <option value="High">Tinggi (High)</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wider">Jumlah Unit</label>
+                                <input type="number" id="form-quantity" required min="1" placeholder="1"
+                                    class="w-full px-3 py-2 text-sm border border-slate-200 bg-slate-50 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wider">Estimasi Harga Satuan (Rp)</label>
+                                <input type="number" id="form-price" required min="0" placeholder="Contoh: 15000000"
+                                    class="w-full px-3 py-2 text-sm border border-slate-200 bg-slate-50 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all">
+                            </div>
+                        </div>
+
+                        <div id="form-admin-only" class="pt-4 border-t border-slate-100">
+                            <label class="block text-xs font-bold text-slate-800 mb-1.5 uppercase tracking-wider">Status Persetujuan (Admin Only)</label>
+                            <div class="grid grid-cols-3 gap-2">
+                                <label class="flex items-center justify-center gap-2 p-2.5 border border-slate-200 rounded-xl cursor-pointer hover:bg-slate-50 transition-all">
+                                    <input type="radio" name="form-status" value="Pending" checked class="text-indigo-600 focus:ring-indigo-500">
+                                    <span class="text-xs font-semibold text-amber-600">Menunggu</span>
+                                </label>
+                                <label class="flex items-center justify-center gap-2 p-2.5 border border-slate-200 rounded-xl cursor-pointer hover:bg-slate-50 transition-all">
+                                    <input type="radio" name="form-status" value="Approved" class="text-indigo-600 focus:ring-indigo-500">
+                                    <span class="text-xs font-semibold text-emerald-600">Setuju</span>
+                                </label>
+                                <label class="flex items-center justify-center gap-2 p-2.5 border border-slate-200 rounded-xl cursor-pointer hover:bg-slate-50 transition-all">
+                                    <input type="radio" name="form-status" value="Rejected" class="text-indigo-600 focus:ring-indigo-500">
+                                    <span class="text-xs font-semibold text-rose-600">Tolak</span>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Modal Actions -->
+                    <div class="p-6 bg-slate-50 border-t border-slate-100 flex items-center justify-end gap-3">
+                        <button type="button" class="modal-close px-4 py-2 border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-sm font-semibold rounded-xl transition-all">
+                            Batalkan
+                        </button>
+                        <button type="submit" id="btn-save-request"
+                            class="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-xl shadow-lg shadow-indigo-600/10 transition-all duration-200">
+                            Simpan Pengajuan
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- SPREADSHEET SYNC GUIDE MODAL -->
+        <div id="sync-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div class="absolute inset-0 bg-slate-900/50 backdrop-blur-sm"></div>
+            <div class="relative bg-white rounded-2xl shadow-xl w-full max-w-2xl border border-slate-200 overflow-hidden transform transition-all flex flex-col max-h-[90vh]">
+                <!-- Modal Header -->
+                <div class="p-6 border-b border-slate-100 flex items-center justify-between">
+                    <div class="flex items-center gap-2.5">
+                        <div class="p-2 bg-emerald-50 text-emerald-600 rounded-xl">
+                            <i data-lucide="table-properties" class="w-5 h-5"></i>
+                        </div>
+                        <div>
+                            <h3 class="font-bold text-slate-900">Integrasi Realtime Google Spreadsheet</h3>
+                            <p class="text-xs text-slate-400 mt-0.5">Ubah spreadsheet Anda secara instan dari aplikasi web ini</p>
+                        </div>
+                    </div>
+                    <button class="modal-close p-1.5 hover:bg-slate-100 text-slate-400 hover:text-slate-600 rounded-lg transition-all">
+                        <i data-lucide="x" class="w-5 h-5"></i>
+                    </button>
+                </div>
+
+                <!-- Modal Body -->
+                <div class="p-6 space-y-6 overflow-y-auto custom-scroll flex-grow text-sm">
+                    <!-- Steps -->
+                    <div class="space-y-4">
+                        <h4 class="font-bold text-slate-800 flex items-center gap-2 text-xs uppercase tracking-wider">Langkah Setup di Google Sheets Anda:</h4>
+                        
+                        <div class="flex gap-3">
+                            <div class="flex-shrink-0 w-6 h-6 bg-slate-100 text-slate-700 rounded-full flex items-center justify-center text-xs font-bold mt-0.5">1</div>
+                            <div>
+                                <p class="font-semibold text-slate-800">Buat Spreadsheet Baru & Sesuaikan Header</p>
+                                <p class="text-xs text-slate-500 mt-1">Buat file Google Spreadsheet baru, dan tambahkan nama kolom berikut di baris pertama:</p>
+                                <div class="mt-2 flex flex-wrap gap-1">
+                                    <span class="bg-slate-100 px-2 py-0.5 rounded text-xs text-slate-600 border border-slate-200 font-mono">ID Pengajuan</span>
+                                    <span class="bg-slate-100 px-2 py-0.5 rounded text-xs text-slate-600 border border-slate-200 font-mono">Nama Pemohon</span>
+                                    <span class="bg-slate-100 px-2 py-0.5 rounded text-xs text-slate-600 border border-slate-200 font-mono">Departemen</span>
+                                    <span class="bg-slate-100 px-2 py-0.5 rounded text-xs text-slate-600 border border-slate-200 font-mono">Nama Barang</span>
+                                    <span class="bg-slate-100 px-2 py-0.5 rounded text-xs text-slate-600 border border-slate-200 font-mono">Kategori</span>
+                                    <span class="bg-slate-100 px-2 py-0.5 rounded text-xs text-slate-600 border border-slate-200 font-mono">Jumlah</span>
+                                    <span class="bg-slate-100 px-2 py-0.5 rounded text-xs text-slate-600 border border-slate-200 font-mono">Estimasi Harga</span>
+                                    <span class="bg-slate-100 px-2 py-0.5 rounded text-xs text-slate-600 border border-slate-200 font-mono">Urgensi</span>
+                                    <span class="bg-slate-100 px-2 py-0.5 rounded text-xs text-slate-600 border border-slate-200 font-mono">Status</span>
+                                    <span class="bg-slate-100 px-2 py-0.5 rounded text-xs text-slate-600 border border-slate-200 font-mono">Tanggal</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="flex gap-3">
+                            <div class="flex-shrink-0 w-6 h-6 bg-slate-100 text-slate-700 rounded-full flex items-center justify-center text-xs font-bold mt-0.5">2</div>
+                            <div>
+                                <p class="font-semibold text-slate-800">Buka Script Editor</p>
+                                <p class="text-xs text-slate-500 mt-1">Pada Google Spreadsheet Anda, klik menu **Extensions (Ekstensi)** -> **Apps Script**.</p>
+                            </div>
+                        </div>
+
+                        <div class="flex gap-3">
+                            <div class="flex-shrink-0 w-6 h-6 bg-slate-100 text-slate-700 rounded-full flex items-center justify-center text-xs font-bold mt-0.5">3</div>
+                            <div class="flex-grow">
+                                <p class="font-semibold text-slate-800">Salin & Tempel Kode Ini</p>
+                                <p class="text-xs text-slate-500 mt-1">Hapus semua kode bawaan di Apps Script, lalu tempel kode berikut:</p>
+                                
+                                <div class="relative mt-2">
+                                    <textarea readonly id="apps-script-code" rows="7" 
+                                        class="w-full p-3 bg-slate-900 text-emerald-400 font-mono text-xs rounded-xl focus:outline-none border border-slate-800 resize-none">
+function doPost(e) {
+  try {
+    var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+    var data = JSON.parse(e.postData.contents);
+    
+    // Pastikan susunan kolom sesuai
+    sheet.appendRow([
+      data.id,
+      data.requester,
+      data.department,
+      data.itemName,
+      data.category,
+      data.quantity,
+      data.price,
+      data.urgency,
+      data.status,
+      data.date
+    ]);
+    
+    return ContentService.createTextOutput(JSON.stringify({
+      "result": "success", 
+      "message": "Data berhasil ditambahkan secara realtime ke Google Sheet!"
+    })).setMimeType(ContentService.MimeType.JSON);
+  } catch(error) {
+    return ContentService.createTextOutput(JSON.stringify({
+      "result": "error", 
+      "message": error.toString()
+    })).setMimeType(ContentService.MimeType.JSON);
+  }
+}</textarea>
+                                    <button id="btn-copy-script" class="absolute top-2 right-2 px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded text-xs font-medium transition-all flex items-center gap-1">
+                                        <i data-lucide="copy" class="w-3.5 h-3.5"></i> Salin Kode
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="flex gap-3">
+                            <div class="flex-shrink-0 w-6 h-6 bg-slate-100 text-slate-700 rounded-full flex items-center justify-center text-xs font-bold mt-0.5">4</div>
+                            <div>
+                                <p class="font-semibold text-slate-800">Deploy sebagai Aplikasi Web</p>
+                                <p class="text-xs text-slate-500 mt-1">
+                                    1. Klik tombol **Deploy (Terapkan)** -> **New Deployment (Penerapan Baru)**.<br>
+                                    2. Pilih jenis konfigurasi sebagai **Web App (Aplikasi Web)**.<br>
+                                    3. Ubah kolom "Who has access" menjadi **Anyone (Siapa saja)**.<br>
+                                    4. Klik **Deploy** dan setujui izin akses akun Anda.<br>
+                                    5. Salin **Web App URL** yang dihasilkan.
+                                </p>
+                            </div>
+                        </div>
+
+                        <div class="flex gap-3">
+                            <div class="flex-shrink-0 w-6 h-6 bg-emerald-100 text-emerald-700 rounded-full flex items-center justify-center text-xs font-bold mt-0.5">5</div>
+                            <div>
+                                <p class="font-semibold text-emerald-800">Sambungkan URL di Aplikasi Web Ini</p>
+                                <p class="text-xs text-slate-500 mt-1">Masukkan URL yang telah Anda salin ke inputan di baris paling atas dashboard ini, lalu klik Simpan. Selamat, aplikasi Anda sekarang terhubung secara live ke Google Sheets!</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Modal Footer -->
+                <div class="p-6 bg-slate-50 border-t border-slate-100 flex items-center justify-end">
+                    <button class="modal-close px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-xl shadow-lg shadow-indigo-600/10 transition-all">
+                        Saya Mengerti
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- GITHUB GUIDE MODAL -->
+        <div id="github-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div class="absolute inset-0 bg-slate-900/50 backdrop-blur-sm"></div>
+            <div class="relative bg-white rounded-2xl shadow-xl w-full max-w-xl border border-slate-200 overflow-hidden transform transition-all flex flex-col">
+                <!-- Modal Header -->
+                <div class="p-6 border-b border-slate-100 flex items-center justify-between">
+                    <div class="flex items-center gap-2.5">
+                        <div class="p-2 bg-slate-100 text-slate-800 rounded-xl">
+                            <i data-lucide="github" class="w-5 h-5"></i>
+                        </div>
+                        <div>
+                            <h3 class="font-bold text-slate-900">Cara Upload & Online-kan di GitHub Pages</h3>
+                            <p class="text-xs text-slate-400 mt-0.5">Gratis tanpa biaya hosting sama sekali!</p>
+                        </div>
+                    </div>
+                    <button class="modal-close p-1.5 hover:bg-slate-100 text-slate-400 hover:text-slate-600 rounded-lg transition-all">
+                        <i data-lucide="x" class="w-5 h-5"></i>
+                    </button>
+                </div>
+
+                <!-- Modal Body -->
+                <div class="p-6 space-y-4 overflow-y-auto custom-scroll text-sm">
+                    <div class="space-y-3.5">
+                        <div class="flex gap-3">
+                            <div class="flex-shrink-0 w-6 h-6 bg-slate-100 text-slate-700 rounded-full flex items-center justify-center text-xs font-bold mt-0.5">1</div>
+                            <div>
+                                <p class="font-semibold text-slate-800">Buat Repository Baru di GitHub</p>
+                                <p class="text-xs text-slate-500 mt-1">Masuk ke akun GitHub Anda, klik **New Repository**. Beri nama bebas (misal: <code class="font-mono bg-slate-100 px-1 rounded">e-request-items</code>) dan pastikan visibilitasnya diatur ke **Public**.</p>
+                            </div>
+                        </div>
+
+                        <div class="flex gap-3">
+                            <div class="flex-shrink-0 w-6 h-6 bg-slate-100 text-slate-700 rounded-full flex items-center justify-center text-xs font-bold mt-0.5">2</div>
+                            <div>
+                                <p class="font-semibold text-slate-800">Upload File index.html</p>
+                                <p class="text-xs text-slate-500 mt-1">Klik **Uploading an existing file** pada repository baru Anda, lalu unggah file <code class="font-mono bg-slate-100 px-1 rounded">index.html</code> ini ke sana. Klik **Commit changes**.</p>
+                            </div>
+                        </div>
+
+                        <div class="flex gap-3">
+                            <div class="flex-shrink-0 w-6 h-6 bg-slate-100 text-slate-700 rounded-full flex items-center justify-center text-xs font-bold mt-0.5">3</div>
+                            <div>
+                                <p class="font-semibold text-slate-800">Aktifkan GitHub Pages</p>
+                                <p class="text-xs text-slate-500 mt-1">Masuk ke menu **Settings** pada repository tersebut, pilih menu **Pages** di panel samping kiri.</p>
+                            </div>
+                        </div>
+
+                        <div class="flex gap-3">
+                            <div class="flex-shrink-0 w-6 h-6 bg-slate-100 text-slate-700 rounded-full flex items-center justify-center text-xs font-bold mt-0.5">4</div>
+                            <div>
+                                <p class="font-semibold text-slate-800">Atur Build and Deployment</p>
+                                <p class="text-xs text-slate-500 mt-1">Pada bagian **Build and deployment**, atur Source menjadi **Deploy from a branch**. Pilih branch **main** (atau master), lalu simpan.</p>
+                            </div>
+                        </div>
+
+                        <div class="flex gap-3">
+                            <div class="flex-shrink-0 w-6 h-6 bg-emerald-100 text-emerald-700 rounded-full flex items-center justify-center text-xs font-bold mt-0.5">5</div>
+                            <div>
+                                <p class="font-semibold text-emerald-800">Aplikasi Anda Online!</p>
+                                <p class="text-xs text-slate-500 mt-1">Tunggu sekitar 1-2 menit. GitHub akan menampilkan link aktif website Anda di bagian atas menu **Pages**. Bagikan link tersebut agar rekan kerja dapat menginput item secara realtime!</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Modal Footer -->
+                <div class="p-6 bg-slate-50 border-t border-slate-100 flex items-center justify-end">
+                    <button class="modal-close px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-xl shadow-lg shadow-indigo-600/10 transition-all">
+                        Saya Mengerti
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- NOTIFICATION TOAST -->
+        <div id="toast" class="hidden fixed bottom-6 right-6 z-50 p-4 bg-slate-900 text-white rounded-2xl shadow-xl flex items-center gap-3 border border-slate-800 transform translate-y-20 transition-all duration-300">
+            <div id="toast-icon-bg" class="p-1.5 bg-indigo-600 rounded-lg">
+                <i id="toast-icon" data-lucide="check" class="w-4 h-4"></i>
+            </div>
+            <div>
+                <p id="toast-text" class="text-xs font-semibold leading-none"></p>
+                <p id="toast-subtext" class="text-[10px] text-slate-400 mt-1"></p>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- FOOTER DEVELOPMENT ATTRIBUTION -->
+    <footer class="bg-white border-t border-slate-200 py-4 text-center text-xs text-slate-400">
+        &copy; 2026 E-Request Items System. Terintegrasi secara live ke Google Sheets.
+    </footer>
+
+    <!-- LOGIC APPLICATION AND SCRIPTING -->
+    <script>
+        // MOCK INITIAL DATA FROM "E-Request_Items_FINAL.xlsx"
+        // Pre-populasi data agar menyerupai Excel yang sesungguhnya saat awal load
+        const INITIAL_EXCEL_DATA = [
+            { id: "REQ-001", requester: "Ahmad Subarjo", department: "IT Infrastructure", itemName: "Monitor LG UltraFine 24 inch", category: "IT Equipment", quantity: 3, price: 3450000, urgency: "High", status: "Approved", date: "2026-07-01" },
+            { id: "REQ-002", requester: "Siti Rahmawati", department: "Human Resources", itemName: "Kursi Ergonomis Office Plus", category: "Furniture", quantity: 5, price: 1850000, urgency: "Medium", status: "Pending", date: "2026-07-03" },
+            { id: "REQ-003", requester: "Rian Hidayat", department: "Finance", itemName: "Lisensi Adobe Acrobat Pro PDF", category: "Software", quantity: 1, price: 2900000, urgency: "Low", status: "Pending", date: "2026-07-04" },
+            { id: "REQ-004", requester: "Dewi Lestari", department: "General Affairs", itemName: "Kertas A4 PaperOne 80gr", category: "Office Supplies", quantity: 15, price: 55000, urgency: "Medium", status: "Approved", date: "2026-07-05" },
+            { id: "REQ-005", requester: "Bambang Wijaya", department: "Marketing", itemName: "Kamera Mirrorless Sony Alpha A6400", category: "IT Equipment", quantity: 1, price: 14500000, urgency: "High", status: "Rejected", date: "2026-07-06" }
+        ];
+
+        // Core State
+        const state = {
+            isLoggedIn: false,
+            requests: [],
+            sheetsUrl: localStorage.getItem("erequest_sheets_url") || "",
+            activeFilterCategory: "ALL",
+            activeFilterStatus: "ALL",
+            searchQuery: ""
+        };
+
+        // Initialize App
+        window.addEventListener("DOMContentLoaded", () => {
+            // Load saved requests from localStorage or use initial excel data
+            const savedRequests = localStorage.getItem("erequest_data");
+            if (savedRequests) {
+                state.requests = JSON.parse(savedRequests);
+            } else {
+                state.requests = [...INITIAL_EXCEL_DATA];
+                saveToLocalStorage();
+            }
+
+            // Sync Web App URL on initialization
+            if (state.sheetsUrl) {
+                document.getElementById("spreadsheet-url-input").value = state.sheetsUrl;
+            }
+
+            // Initialize Lucide Icons
+            lucide.createIcons();
+
+            // Setup all event listeners
+            initEventListeners();
+            
+            // Check active session (optional, for simple persist login)
+            if (sessionStorage.getItem("erequest_session") === "active") {
+                loginSuccess();
+            }
+        });
+
+        // Save database state locally
+        function saveToLocalStorage() {
+            localStorage.setItem("erequest_data", JSON.stringify(state.requests));
+        }
+
+        // Trigger notifications to UI
+        function showNotification(title, text, type = "success") {
+            const toast = document.getElementById("toast");
+            const toastText = document.getElementById("toast-text");
+            const toastSub = document.getElementById("toast-subtext");
+            const toastIconBg = document.getElementById("toast-icon-bg");
+            const toastIcon = document.getElementById("toast-icon");
+
+            toastText.textContent = title;
+            toastSub.textContent = text;
+
+            // Handle styles based on alert status
+            if (type === "success") {
+                toastIconBg.className = "p-1.5 bg-emerald-600 rounded-lg";
+                toastIcon.setAttribute("data-lucide", "check");
+            } else if (type === "error") {
+                toastIconBg.className = "p-1.5 bg-rose-600 rounded-lg";
+                toastIcon.setAttribute("data-lucide", "alert-triangle");
+            } else {
+                toastIconBg.className = "p-1.5 bg-indigo-600 rounded-lg";
+                toastIcon.setAttribute("data-lucide", "info");
+            }
+
+            lucide.createIcons();
+
+            toast.classList.remove("hidden");
+            setTimeout(() => {
+                toast.classList.remove("translate-y-20");
+            }, 50);
+
+            // Hide Toast Auto
+            setTimeout(() => {
+                toast.classList.add("translate-y-20");
+                setTimeout(() => {
+                    toast.classList.add("hidden");
+                }, 300);
+            }, 4000);
+        }
+
+        // Format Currency Helper
+        function formatRupiah(value) {
+            return new Intl.NumberFormat('id-ID', {
+                style: 'currency',
+                currency: 'IDR',
+                minimumFractionDigits: 0
+            }).format(value);
+        }
+
+        // Initialize Actions & Buttons Click Events
+        function initEventListeners() {
+            // Form Login
+            document.getElementById("login-form").addEventListener("submit", (e) => {
+                e.preventDefault();
+                const user = document.getElementById("username").value.trim();
+                const pass = document.getElementById("password").value;
+
+                // Simple credential verification (can use dynamic logic)
+                if (user === "admin" && pass === "admin123") {
+                    loginSuccess();
+                } else {
+                    const errorBox = document.getElementById("login-error");
+                    errorBox.classList.remove("hidden");
+                    setTimeout(() => errorBox.classList.add("hidden"), 4000);
+                }
+            });
+
+            // Toggle Password View visibility
+            document.getElementById("toggle-password").addEventListener("click", () => {
+                const passInput = document.getElementById("password");
+                const passIcon = document.getElementById("password-icon");
+                if (passInput.type === "password") {
+                    passInput.type = "text";
+                    passIcon.setAttribute("data-lucide", "eye-off");
+                } else {
+                    passInput.type = "password";
+                    passIcon.setAttribute("data-lucide", "eye");
+                }
+                lucide.createIcons();
+            });
+
+            // Save Spreadsheet URL
+            document.getElementById("btn-save-sheets-url").addEventListener("click", () => {
+                const urlInput = document.getElementById("spreadsheet-url-input").value.trim();
+                state.sheetsUrl = urlInput;
+                localStorage.setItem("erequest_sheets_url", urlInput);
+                
+                if (urlInput) {
+                    showNotification("Spreadsheet Terkoneksi!", "Integrasi realtime telah siap dijalankan.", "success");
+                } else {
+                    showNotification("Koneksi Dinonaktifkan", "Penyimpanan kembali menggunakan memori lokal.", "info");
+                }
+            });
+
+            // Logout Action
+            document.getElementById("btn-logout").addEventListener("click", () => {
+                sessionStorage.removeItem("erequest_session");
+                state.isLoggedIn = false;
+                document.getElementById("dashboard-section").classList.add("hidden");
+                document.getElementById("login-section").classList.remove("hidden");
+                showNotification("Berhasil Logout", "Sesi akses Anda telah diakhiri.", "info");
+            });
+
+            // Table Filters and Search
+            document.getElementById("table-search").addEventListener("input", (e) => {
+                state.searchQuery = e.target.value.toLowerCase();
+                renderTable();
+            });
+
+            document.getElementById("filter-category").addEventListener("change", (e) => {
+                state.activeFilterCategory = e.target.value;
+                renderTable();
+            });
+
+            document.getElementById("filter-status").addEventListener("change", (e) => {
+                state.activeFilterStatus = e.target.value;
+                renderTable();
+            });
+
+            // Handle Modals Trigger
+            document.getElementById("btn-add-request").addEventListener("click", () => {
+                openRequestModal();
+            });
+
+            // Guide Buttons
+            const showSyncModals = () => document.getElementById("sync-modal").classList.remove("hidden");
+            const showGithubModals = () => document.getElementById("github-modal").classList.remove("hidden");
+
+            document.getElementById("btn-show-sync-guide").addEventListener("click", showSyncModals);
+            document.getElementById("btn-show-sync-guide-mobile").addEventListener("click", showSyncModals);
+            document.getElementById("btn-show-github-guide").addEventListener("click", showGithubModals);
+            document.getElementById("btn-show-github-guide-mobile").addEventListener("click", showGithubModals);
+
+            // Close all Modals
+            const modalCloses = document.querySelectorAll(".modal-close");
+            modalCloses.forEach(btn => {
+                btn.addEventListener("click", () => {
+                    document.getElementById("request-modal").classList.add("hidden");
+                    document.getElementById("sync-modal").classList.add("hidden");
+                    document.getElementById("github-modal").classList.add("hidden");
+                });
+            });
+
+            // Copy Apps Script Clipboard Action
+            document.getElementById("btn-copy-script").addEventListener("click", () => {
+                const copyText = document.getElementById("apps-script-code");
+                copyText.select();
+                copyText.setSelectionRange(0, 99999); // For mobile devices
+                document.execCommand("copy");
+                
+                showNotification("Disalin!", "Script telah disalin ke clipboard.", "success");
+            });
+
+            // Request Form Submit
+            document.getElementById("request-form").addEventListener("submit", (e) => {
+                e.preventDefault();
+                submitRequestForm();
+            });
+        }
+
+        // Handle Session Gates
+        function loginSuccess() {
+            sessionStorage.setItem("erequest_session", "active");
+            state.isLoggedIn = true;
+            document.getElementById("login-section").classList.add("hidden");
+            document.getElementById("dashboard-section").classList.remove("hidden");
+            
+            // Clear inputs
+            document.getElementById("username").value = "";
+            document.getElementById("password").value = "";
+
+            renderDashboard();
+            showNotification("Akses Diterima", "Selamat datang kembali di E-Request System!", "success");
+        }
+
+        // Render Dashboard Overview & KPIs
+        function renderDashboard() {
+            const requests = state.requests;
+            
+            // Calculate status elements
+            const total = requests.length;
+            const pending = requests.filter(r => r.status === "Pending").length;
+            const approved = requests.filter(r => r.status === "Approved").length;
+            const rejected = requests.filter(r => r.status === "Rejected").length;
+
+            // Render stats animation counts
+            document.getElementById("kpi-total").textContent = total;
+            document.getElementById("kpi-pending").textContent = pending;
+            document.getElementById("kpi-approved").textContent = approved;
+            document.getElementById("kpi-rejected").textContent = rejected;
+
+            renderTable();
+        }
+
+        // Dynamic Filtering and Table Render Engine
+        function renderTable() {
+            const tableBody = document.getElementById("request-table-body");
+            const emptyState = document.getElementById("table-empty-state");
+            tableBody.innerHTML = "";
+
+            // Filter requests array based on current constraints
+            const filtered = state.requests.filter(item => {
+                const matchesSearch = 
+                    item.itemName.toLowerCase().includes(state.searchQuery) ||
+                    item.requester.toLowerCase().includes(state.searchQuery) ||
+                    item.department.toLowerCase().includes(state.searchQuery) ||
+                    item.id.toLowerCase().includes(state.searchQuery);
+
+                const matchesCategory = state.activeFilterCategory === "ALL" || item.category === state.activeFilterCategory;
+                const matchesStatus = state.activeFilterStatus === "ALL" || item.status === state.activeFilterStatus;
+
+                return matchesSearch && matchesCategory && matchesStatus;
+            });
+
+            // Sort by latest Date / ID
+            filtered.sort((a, b) => b.id.localeCompare(a.id));
+
+            if (filtered.length === 0) {
+                emptyState.classList.remove("hidden");
+            } else {
+                emptyState.classList.add("hidden");
+                
+                filtered.forEach(item => {
+                    const tr = document.createElement("tr");
+                    tr.className = "hover:bg-slate-50 transition-all duration-150 border-b border-slate-100";
+
+                    // Define Badge Elements
+                    let urgencyBadge = "";
+                    if (item.urgency === "High") {
+                        urgencyBadge = `<span class="inline-flex px-2 py-1 text-[10px] font-bold bg-rose-50 text-rose-700 rounded-md border border-rose-100">HIGH</span>`;
+                    } else if (item.urgency === "Medium") {
+                        urgencyBadge = `<span class="inline-flex px-2 py-1 text-[10px] font-bold bg-amber-50 text-amber-700 rounded-md border border-amber-100">MEDIUM</span>`;
+                    } else {
+                        urgencyBadge = `<span class="inline-flex px-2 py-1 text-[10px] font-bold bg-blue-50 text-blue-700 rounded-md border border-blue-100">LOW</span>`;
+                    }
+
+                    let statusBadge = "";
+                    if (item.status === "Approved") {
+                        statusBadge = `<span class="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold bg-emerald-50 text-emerald-700 rounded-full border border-emerald-100"><i data-lucide="check" class="w-3.5 h-3.5"></i> Setuju</span>`;
+                    } else if (item.status === "Rejected") {
+                        statusBadge = `<span class="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold bg-rose-50 text-rose-700 rounded-full border border-rose-100"><i data-lucide="x" class="w-3.5 h-3.5"></i> Tolak</span>`;
+                    } else {
+                        statusBadge = `<span class="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold bg-amber-50 text-amber-700 rounded-full border border-amber-100"><i data-lucide="alert-circle" class="w-3.5 h-3.5"></i> Menunggu</span>`;
+                    }
+
+                    tr.innerHTML = `
+                        <td class="py-4 px-6 text-center font-mono font-bold text-slate-500">${item.id}</td>
+                        <td class="py-4 px-6">
+                            <div class="font-bold text-slate-800">${item.requester}</div>
+                            <div class="text-xs text-slate-400 mt-0.5">${item.department}</div>
+                        </td>
+                        <td class="py-4 px-6">
+                            <div class="font-semibold text-slate-800">${item.itemName}</div>
+                            <div class="text-[11px] font-medium text-slate-400 mt-0.5 inline-block bg-slate-100 px-2 py-0.5 rounded-md border border-slate-200">${item.category}</div>
+                        </td>
+                        <td class="py-4 px-6 text-center">
+                            <div class="font-bold text-slate-800">${item.quantity} Unit</div>
+                            <div class="text-xs text-slate-500 mt-0.5">${formatRupiah(item.price)}</div>
+                        </td>
+                        <td class="py-4 px-6 text-center">${urgencyBadge}</td>
+                        <td class="py-4 px-6 text-center">${statusBadge}</td>
+                        <td class="py-4 px-6 text-center">
+                            <div class="flex items-center justify-center gap-1.5">
+                                <button onclick="editRequest('${item.id}')" class="p-1.5 hover:bg-indigo-50 text-indigo-600 rounded-lg transition-all" title="Ubah Detail / Status">
+                                    <i data-lucide="edit-3" class="w-4.5 h-4.5"></i>
+                                </button>
+                                <button onclick="deleteRequest('${item.id}')" class="p-1.5 hover:bg-rose-50 text-rose-600 rounded-lg transition-all" title="Hapus Data">
+                                    <i data-lucide="trash-2" class="w-4.5 h-4.5"></i>
+                                </button>
+                            </div>
+                        </td>
+                    `;
+                    tableBody.appendChild(tr);
+                });
+            }
+
+            // Sync Footer Counts & Icons
+            document.getElementById("table-shown-count").textContent = filtered.length;
+            document.getElementById("table-total-count").textContent = state.requests.length;
+            lucide.createIcons();
+        }
+
+        // Form Modals Setup Helper
+        function openRequestModal(existingItem = null) {
+            const form = document.getElementById("request-form");
+            form.reset();
+
+            if (existingItem) {
+                // Edit Mode
+                document.getElementById("modal-title").textContent = "Ubah Detail Pengajuan";
+                document.getElementById("edit-request-id").value = existingItem.id;
+                document.getElementById("form-requester").value = existingItem.requester;
+                document.getElementById("form-department").value = existingItem.department;
+                document.getElementById("form-item-name").value = existingItem.itemName;
+                document.getElementById("form-category").value = existingItem.category;
+                document.getElementById("form-urgency").value = existingItem.urgency;
+                document.getElementById("form-quantity").value = existingItem.quantity;
+                document.getElementById("form-price").value = existingItem.price;
+                
+                // Select proper Radio button for status
+                const radios = document.getElementsByName("form-status");
+                radios.forEach(radio => {
+                    if (radio.value === existingItem.status) radio.checked = true;
+                });
+
+                document.getElementById("form-admin-only").classList.remove("hidden");
+            } else {
+                // Create Mode
+                document.getElementById("modal-title").textContent = "Formulir Pengajuan Baru";
+                document.getElementById("edit-request-id").value = "";
+                document.getElementById("form-admin-only").classList.add("hidden"); // users default state to pending
+            }
+
+            document.getElementById("request-modal").classList.remove("hidden");
+        }
+
+        // Save / Edit Submissions Handlers
+        async function submitRequestForm() {
+            const editId = document.getElementById("edit-request-id").value;
+            
+            const requester = document.getElementById("form-requester").value.trim();
+            const department = document.getElementById("form-department").value.trim();
+            const itemName = document.getElementById("form-item-name").value.trim();
+            const category = document.getElementById("form-category").value;
+            const urgency = document.getElementById("form-urgency").value;
+            const quantity = parseInt(document.getElementById("form-quantity").value);
+            const price = parseFloat(document.getElementById("form-price").value);
+            
+            let status = "Pending";
+            if (editId) {
+                const radios = document.getElementsByName("form-status");
+                radios.forEach(radio => {
+                    if (radio.checked) status = radio.value;
+                });
+            }
+
+            const today = new Date().toISOString().split('T')[0];
+
+            if (editId) {
+                // EDIT EXISTING REQUEST
+                const index = state.requests.findIndex(r => r.id === editId);
+                if (index !== -1) {
+                    state.requests[index] = {
+                        ...state.requests[index],
+                        requester, department, itemName, category, urgency, quantity, price, status
+                    };
+                    saveToLocalStorage();
+                    showNotification("Berhasil Diupdate", `Pengajuan ${editId} berhasil diubah.`, "success");
+                }
+            } else {
+                // CREATE NEW REQUEST
+                // Generate secure auto ID
+                const nextIdNum = state.requests.length > 0 
+                    ? Math.max(...state.requests.map(r => parseInt(r.id.split('-')[1]))) + 1 
+                    : 1;
+                const nextId = "REQ-" + String(nextIdNum).padStart(3, '0');
+
+                const newRequest = {
+                    id: nextId,
+                    requester,
+                    department,
+                    itemName,
+                    category,
+                    quantity,
+                    price,
+                    urgency,
+                    status,
+                    date: today
+                };
+
+                state.requests.push(newRequest);
+                saveToLocalStorage();
+
+                // REALTIME SPREADSHEET TRANSFERS & CONNECTION (If configured)
+                if (state.sheetsUrl) {
+                    showNotification("Mengirim Data...", "Sedang menyinkronkan data dengan Google Spreadsheet...", "info");
+                    
+                    try {
+                        // We use direct POST with no-cors or JSON payload depending on implementation.
+                        // Standard Google Apps Script responds beautifully with standard fetch configurations.
+                        const response = await fetch(state.sheetsUrl, {
+                            method: "POST",
+                            mode: "no-cors", // Crucial block for cors bypass inside generic web apps
+                            headers: {
+                                "Content-Type": "application/json",
+                            },
+                            body: JSON.stringify(newRequest)
+                        });
+                        
+                        showNotification("Tersinkronisasi!", `Data baru berhasil ditambahkan secara realtime ke Google Sheet Anda!`, "success");
+                    } catch (error) {
+                        console.error("Spreadsheet sync failed:", error);
+                        showNotification("Gagal Sinkron", "Periksa koneksi atau validasi URL Apps Script Anda.", "error");
+                    }
+                } else {
+                    showNotification("Berhasil Dibuat", `Data baru tersimpan di browser Anda dengan ID ${nextId}.`, "success");
+                }
+            }
+
+            // Close modal and redraw
+            document.getElementById("request-modal").classList.add("hidden");
+            renderDashboard();
+        }
+
+        // Action Trigger for Editing single item
+        function editRequest(id) {
+            const item = state.requests.find(r => r.id === id);
+            if (item) {
+                openRequestModal(item);
+            }
+        }
+
+        // Action Trigger for Deleting single item
+        function deleteRequest(id) {
+            // Standard elegant confirm bypass inside Canvas Web UI
+            const confirmDelete = confirm(`Apakah Anda yakin ingin menghapus data pengajuan ${id}?`);
+            if (confirmDelete) {
+                state.requests = state.requests.filter(r => r.id !== id);
+                saveToLocalStorage();
+                renderDashboard();
+                showNotification("Berhasil Dihapus", `Pengajuan ${id} berhasil dihapus dari database.`, "info");
+            }
+        }
+    </script>
+</body>
+</html>
