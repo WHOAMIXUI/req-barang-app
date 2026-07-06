@@ -329,6 +329,7 @@
                                             <th class="py-4 px-6">Nama Barang / Kategori</th>
                                             <th class="py-4 px-6 text-center">Jumlah / Est. Harga</th>
                                             <th class="py-4 px-6 text-center">Tingkat Urgensi</th>
+                                            <th class="py-4 px-6 text-center">Bukti</th>
                                             <th class="py-4 px-6 text-center">Status</th>
                                             <th class="py-4 px-6 text-center">Aksi</th>
                                         </tr>
@@ -539,6 +540,27 @@
                             </div>
                         </div>
 
+                        <!-- INPUT UPLOAD GAMBAR -->
+                        <div class="pt-2">
+                            <label class="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wider">Bukti Foto / Gambar (Opsional)</label>
+                            <div class="flex items-center gap-4">
+                                <label class="flex-grow flex flex-col items-center justify-center border-2 border-dashed border-slate-200 hover:border-indigo-500 rounded-xl p-3 cursor-pointer bg-slate-50 hover:bg-indigo-50/20 transition-all duration-200">
+                                    <div class="flex items-center gap-2 text-slate-500 hover:text-indigo-600">
+                                        <i data-lucide="upload-cloud" class="w-5 h-5" id="form-upload-icon"></i>
+                                        <span class="text-xs font-semibold" id="form-upload-label">Klik untuk Upload Foto...</span>
+                                    </div>
+                                    <input type="file" id="form-image-file" accept="image/*" class="hidden">
+                                </label>
+                                <div id="form-image-preview-container" class="hidden relative w-16 h-16 rounded-xl overflow-hidden border border-slate-200 shadow-sm flex-shrink-0">
+                                    <img id="form-image-preview" src="" alt="Pratinjau Foto" class="w-full h-full object-cover">
+                                    <button type="button" id="btn-remove-image" class="absolute top-0 right-0 bg-rose-600 text-white p-0.5 rounded-bl-lg hover:bg-rose-700 transition-colors shadow" title="Hapus Foto">
+                                        <i data-lucide="x" class="w-3.5 h-3.5"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <p class="text-[10px] text-slate-400 mt-1">Sistem akan mengompresi gambar otomatis agar menghemat ruang penyimpanan.</p>
+                        </div>
+
                         <div id="form-admin-only" class="pt-4 border-t border-slate-100">
                             <label class="block text-xs font-bold text-slate-800 mb-1.5 uppercase tracking-wider">Status Persetujuan (Admin Only)</label>
                             <div class="grid grid-cols-3 gap-2">
@@ -591,6 +613,32 @@
                     </button>
                     <button type="button" id="btn-confirm-delete" class="flex-1 py-2 bg-rose-600 hover:bg-rose-700 text-white text-sm font-semibold rounded-xl transition-all shadow-md shadow-rose-600/10">
                         Ya, Hapus Data
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ================= MODAL: LIGHTBOX DETAIL GAMBAR ================= -->
+        <div id="lightbox-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4">
+            <!-- Backdrop -->
+            <div class="absolute inset-0 bg-slate-950/80 backdrop-blur-sm"></div>
+            <!-- Content -->
+            <div class="relative bg-white rounded-2xl shadow-xl w-full max-w-lg border border-slate-200 overflow-hidden transform transition-all flex flex-col">
+                <div class="p-4 border-b border-slate-200 flex items-center justify-between">
+                    <div>
+                        <h3 class="font-bold text-slate-900 text-sm" id="lightbox-title">Bukti Foto Pengajuan</h3>
+                        <p class="text-[10px] text-slate-400" id="lightbox-subtitle"></p>
+                    </div>
+                    <button id="btn-close-lightbox" class="p-1 hover:bg-slate-100 text-slate-400 hover:text-slate-600 rounded-lg transition-all">
+                        <i data-lucide="x" class="w-5 h-5"></i>
+                    </button>
+                </div>
+                <div class="p-6 flex items-center justify-center bg-slate-950">
+                    <img id="lightbox-img" src="" alt="Detail Gambar Bukti" class="max-h-[60vh] object-contain rounded-lg shadow-md">
+                </div>
+                <div class="p-4 bg-slate-50 text-center border-t border-slate-100">
+                    <button id="btn-close-lightbox-ok" class="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl shadow-md transition-all">
+                        Tutup Tampilan
                     </button>
                 </div>
             </div>
@@ -821,11 +869,11 @@ function doPost(e) {
     <script>
         // DATA AWAL SESUAI FORMAT "E-Request_Items_FINAL.xlsx" DENGAN CABANG
         const INITIAL_EXCEL_DATA = [
-            { id: "REQ-001", requester: "Ahmad Subarjo", branch: "Cabang Jakarta", itemName: "Monitor LG UltraFine 24 inch", category: "IT Equipment", quantity: 3, price: 3450000, urgency: "High", status: "Approved", date: "2026-07-01" },
-            { id: "REQ-002", requester: "Siti Rahmawati", branch: "Cabang Bandung", itemName: "Kursi Ergonomis Office Plus", category: "Furniture", quantity: 5, price: 1850000, urgency: "Medium", status: "Pending", date: "2026-07-03" },
-            { id: "REQ-003", requester: "Rian Hidayat", branch: "Cabang Surabaya", itemName: "Lisensi Adobe Acrobat Pro PDF", category: "Software", quantity: 1, price: 2900000, urgency: "Low", status: "Pending", date: "2026-07-04" },
-            { id: "REQ-004", requester: "Dewi Lestari", branch: "Cabang Jakarta", itemName: "Kertas A4 PaperOne 80gr", category: "Office Supplies", quantity: 15, price: 55000, urgency: "Medium", status: "Approved", date: "2026-07-05" },
-            { id: "REQ-005", requester: "Bambang Wijaya", branch: "Cabang Medan", itemName: "Kamera Mirrorless Sony Alpha A6400", category: "IT Equipment", quantity: 1, price: 14500000, urgency: "High", status: "Rejected", date: "2026-07-06" }
+            { id: "REQ-001", requester: "Ahmad Subarjo", branch: "Cabang Jakarta", itemName: "Monitor LG UltraFine 24 inch", category: "IT Equipment", quantity: 3, price: 3450000, urgency: "High", status: "Approved", date: "2026-07-01", image: "" },
+            { id: "REQ-002", requester: "Siti Rahmawati", branch: "Cabang Bandung", itemName: "Kursi Ergonomis Office Plus", category: "Furniture", quantity: 5, price: 1850000, urgency: "Medium", status: "Pending", date: "2026-07-03", image: "" },
+            { id: "REQ-003", requester: "Rian Hidayat", branch: "Cabang Surabaya", itemName: "Lisensi Adobe Acrobat Pro PDF", category: "Software", quantity: 1, price: 2900000, urgency: "Low", status: "Pending", date: "2026-07-04", image: "" },
+            { id: "REQ-004", requester: "Dewi Lestari", branch: "Cabang Jakarta", itemName: "Kertas A4 PaperOne 80gr", category: "Office Supplies", quantity: 15, price: 55000, urgency: "Medium", status: "Approved", date: "2026-07-05", image: "" },
+            { id: "REQ-005", requester: "Bambang Wijaya", branch: "Cabang Medan", itemName: "Kamera Mirrorless Sony Alpha A6400", category: "IT Equipment", quantity: 1, price: 14500000, urgency: "High", status: "Rejected", date: "2026-07-06", image: "" }
         ];
 
         // Core App State
@@ -841,6 +889,7 @@ function doPost(e) {
             activeFilterStatus: "ALL",
             searchQuery: "",
             pendingDeleteId: null,
+            currentFormImageBase64: "", // Temporary Base64 cache for forms
             charts: {
                 urgency: null,
                 branch: null,
@@ -982,6 +1031,46 @@ function doPost(e) {
             }).format(value);
         }
 
+        // ================= COMPRESS IMAGE UTILITY =================
+        function compressImageFile(file, callback) {
+            const reader = new FileReader();
+            reader.onload = function (event) {
+                const img = new Image();
+                img.onload = function () {
+                    const canvas = document.createElement("canvas");
+                    const ctx = canvas.getContext("2d");
+                    
+                    // Batasi resolusi maksimal 400px (Sangat cukup untuk preview & hemat memori)
+                    const MAX_WIDTH = 400;
+                    const MAX_HEIGHT = 400;
+                    let width = img.width;
+                    let height = img.height;
+
+                    if (width > height) {
+                        if (width > MAX_WIDTH) {
+                            height *= MAX_WIDTH / width;
+                            width = MAX_WIDTH;
+                        }
+                    } else {
+                        if (height > MAX_HEIGHT) {
+                            width *= MAX_HEIGHT / height;
+                            height = MAX_HEIGHT;
+                        }
+                    }
+
+                    canvas.width = width;
+                    canvas.height = height;
+                    ctx.drawImage(img, 0, 0, width, height);
+                    
+                    // Kompresi ke format JPEG dengan kualitas 70%
+                    const compressedBase64 = canvas.toDataURL("image/jpeg", 0.7);
+                    callback(compressedBase64);
+                };
+                img.src = event.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+
         // ================= DYNAMIC LIST MANAGERS =================
         function populateDropdowns() {
             // 1. Populate Branch Filter
@@ -999,7 +1088,7 @@ function doPost(e) {
             const prevCategoryVal = state.activeFilterCategory;
             filterCategory.innerHTML = '<option value="ALL">Semua Kategori</option>';
             state.categories.forEach(c => {
-                filterCategory.innerHTML += `<option value="${c}">${c}</option>`;
+                filterCategory.innerHTML += `<option value="${c}">${c}</option>';
             });
             filterCategory.value = state.categories.includes(prevCategoryVal) ? prevCategoryVal : "ALL";
             state.activeFilterCategory = filterCategory.value;
@@ -1197,6 +1286,57 @@ function doPost(e) {
                 }
                 lucide.createIcons();
             });
+
+            // Handle Image Upload & Compression
+            const imageFileInput = document.getElementById("form-image-file");
+            if (imageFileInput) {
+                imageFileInput.addEventListener("change", (e) => {
+                    const file = e.target.files[0];
+                    if (file) {
+                        const labelText = document.getElementById("form-upload-label");
+                        const iconEl = document.getElementById("form-upload-icon");
+                        
+                        labelText.textContent = "Sedang Kompresi...";
+                        iconEl.setAttribute("data-lucide", "loader-2");
+                        iconEl.classList.add("animate-spin");
+                        lucide.createIcons();
+
+                        compressImageFile(file, (base64) => {
+                            state.currentFormImageBase64 = base64;
+                            
+                            // Tampilkan Pratinjau
+                            document.getElementById("form-image-preview").src = base64;
+                            document.getElementById("form-image-preview-container").classList.remove("hidden");
+                            
+                            // Kembalikan label
+                            labelText.textContent = "Ganti Foto...";
+                            iconEl.setAttribute("data-lucide", "image");
+                            iconEl.classList.remove("animate-spin");
+                            lucide.createIcons();
+                        });
+                    }
+                });
+            }
+
+            // Hapus gambar terpilih di form
+            document.getElementById("btn-remove-image").addEventListener("click", () => {
+                state.currentFormImageBase64 = "";
+                document.getElementById("form-image-file").value = "";
+                document.getElementById("form-image-preview").src = "";
+                document.getElementById("form-image-preview-container").classList.add("hidden");
+                document.getElementById("form-upload-label").textContent = "Klik untuk Upload Foto...";
+                const iconEl = document.getElementById("form-upload-icon");
+                iconEl.setAttribute("data-lucide", "upload-cloud");
+                lucide.createIcons();
+            });
+
+            // Lightbox Modal dismiss handlers
+            const closeLightbox = () => {
+                document.getElementById("lightbox-modal").classList.add("hidden");
+                document.getElementById("lightbox-img").src = "";
+            };
+            document.getElementById("btn-close-lightbox").addEventListener("click", closeLightbox);
+            document.getElementById("btn-close-lightbox-ok").addEventListener("click", closeLightbox);
 
             // Save Web App URL
             document.getElementById("btn-save-sheets-url").addEventListener("click", () => {
@@ -1485,6 +1625,25 @@ function doPost(e) {
                         statusBadge = `<span class="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold bg-amber-50 text-amber-700 rounded-full border border-amber-100"><i data-lucide="alert-circle" class="w-3.5 h-3.5"></i> Menunggu</span>`;
                     }
 
+                    // Bukti Foto / Image status thumbnail
+                    let imageContent = "-";
+                    if (item.image) {
+                        imageContent = `
+                            <button onclick="viewImageDetail('${item.id}')" class="relative group w-10 h-10 rounded-lg overflow-hidden border border-slate-200 shadow-sm inline-block focus:outline-none focus:ring-2 focus:ring-indigo-500" title="Klik untuk memperbesar">
+                                <img src="${item.image}" alt="Bukti" class="w-full h-full object-cover transition-transform group-hover:scale-110">
+                                <div class="absolute inset-0 bg-black/25 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white transition-opacity">
+                                    <i data-lucide="eye" class="w-3.5 h-3.5"></i>
+                                </div>
+                            </button>
+                        `;
+                    } else {
+                        imageContent = `
+                            <span class="text-[10px] font-medium text-slate-400 bg-slate-100 px-2 py-1 rounded border border-slate-200 select-none">
+                                Tanpa Foto
+                            </span>
+                        `;
+                    }
+
                     tr.innerHTML = `
                         <td class="py-4 px-6 text-center font-mono font-bold text-slate-500">${item.id}</td>
                         <td class="py-4 px-6">
@@ -1503,6 +1662,7 @@ function doPost(e) {
                             <div class="text-xs text-slate-500 mt-0.5">${formatRupiah(item.price)}</div>
                         </td>
                         <td class="py-4 px-6 text-center">${urgencyBadge}</td>
+                        <td class="py-4 px-6 text-center">${imageContent}</td>
                         <td class="py-4 px-6 text-center">${statusBadge}</td>
                         <td class="py-4 px-6 text-center">
                             <div class="flex items-center justify-center gap-1.5">
@@ -1524,10 +1684,32 @@ function doPost(e) {
             lucide.createIcons();
         }
 
+        // ================= VIEW IMAGE DETAIL IN LIGHTBOX =================
+        function viewImageDetail(id) {
+            const item = state.requests.find(r => r.id === id);
+            if (item && item.image) {
+                document.getElementById("lightbox-img").src = item.image;
+                document.getElementById("lightbox-subtitle").textContent = `${item.id} - ${item.itemName} (${item.requester})`;
+                document.getElementById("lightbox-modal").classList.remove("hidden");
+            }
+        }
+
+        // Expose viewImageDetail globally
+        window.viewImageDetail = viewImageDetail;
+
         // ================= MODAL FORM CONTROL UTILS =================
         function openRequestModal(existingItem = null) {
             const form = document.getElementById("request-form");
             form.reset();
+
+            // Reset image states
+            state.currentFormImageBase64 = "";
+            document.getElementById("form-image-file").value = "";
+            document.getElementById("form-image-preview").src = "";
+            document.getElementById("form-image-preview-container").classList.add("hidden");
+            document.getElementById("form-upload-label").textContent = "Klik untuk Upload Foto...";
+            const iconEl = document.getElementById("form-upload-icon");
+            iconEl.setAttribute("data-lucide", "upload-cloud");
 
             if (existingItem) {
                 document.getElementById("modal-title").textContent = "Ubah Detail Pengajuan";
@@ -1540,6 +1722,15 @@ function doPost(e) {
                 document.getElementById("form-quantity").value = existingItem.quantity;
                 document.getElementById("form-price").value = existingItem.price;
                 
+                // Set images preview if exists
+                if (existingItem.image) {
+                    state.currentFormImageBase64 = existingItem.image;
+                    document.getElementById("form-image-preview").src = existingItem.image;
+                    document.getElementById("form-image-preview-container").classList.remove("hidden");
+                    document.getElementById("form-upload-label").textContent = "Ganti Foto...";
+                    iconEl.setAttribute("data-lucide", "image");
+                }
+
                 const radios = document.getElementsByName("form-status");
                 radios.forEach(radio => {
                     if (radio.value === existingItem.status) radio.checked = true;
@@ -1552,6 +1743,7 @@ function doPost(e) {
                 document.getElementById("form-admin-only").classList.add("hidden");
             }
 
+            lucide.createIcons();
             document.getElementById("request-modal").classList.remove("hidden");
         }
 
@@ -1566,6 +1758,7 @@ function doPost(e) {
             const urgency = document.getElementById("form-urgency").value;
             const quantity = parseInt(document.getElementById("form-quantity").value);
             const price = parseFloat(document.getElementById("form-price").value);
+            const image = state.currentFormImageBase64 || ""; // Base64 string image
             
             let status = "Pending";
             if (editId) {
@@ -1583,7 +1776,7 @@ function doPost(e) {
                 if (index !== -1) {
                     state.requests[index] = {
                         ...state.requests[index],
-                        requester, branch, itemName, category, urgency, quantity, price, status
+                        requester, branch, itemName, category, urgency, quantity, price, image, status
                     };
                     saveToLocalStorage();
                     showNotification("Berhasil Diupdate", `Pengajuan ${editId} berhasil diperbarui.`, "success");
@@ -1604,6 +1797,7 @@ function doPost(e) {
                     quantity,
                     price,
                     urgency,
+                    image,
                     status,
                     date: today
                 };
@@ -1616,13 +1810,19 @@ function doPost(e) {
                     showNotification("Mengirim Data...", "Sedang menyinkronkan data dengan Google Spreadsheet...", "info");
                     
                     try {
+                        // Persiapkan data kiriman, hilangkan string base64 berat dari payload Sheets agar tidak meluap
+                        const sheetsPayload = { ...newRequest };
+                        if (sheetsPayload.image) {
+                            sheetsPayload.image = "[Gambar Tersimpan di Aplikasi Lokal]"; // Placeholder keterangan gambar untuk sel spreadsheet
+                        }
+
                         const response = await fetch(state.sheetsUrl, {
                             method: "POST",
                             mode: "no-cors", 
                             headers: {
                                 "Content-Type": "text/plain;charset=utf-8",
                             },
-                            body: JSON.stringify(newRequest)
+                            body: JSON.stringify(sheetsPayload)
                         });
                         
                         showNotification("Tersinkronisasi!", `Data baru ${nextId} berhasil terkirim ke Google Sheets!`, "success");
